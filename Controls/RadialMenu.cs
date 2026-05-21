@@ -1,0 +1,575 @@
+using System.Globalization;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using ShortcutWheel.Models;
+using ShortcutWheel.Services;
+
+namespace ShortcutWheel.Controls;
+
+/// <summary>
+/// CSGO-inspired radial menu:
+///   • Dark, near-black wedges with subtle radial gradient
+///   • Warm gold trim (#C9A24E) for borders, separators, numerals, centre
+///   • Hover wedge fades to a gold tint with a brighter outer rim
+///   • Always renders a complete disc – when the menu has no items a
+///     6-wedge placeholder is drawn so the user knows where to drop things
+/// </summary>
+public class RadialMenu : FrameworkElement
+{
+    private const int PlaceholderSlots = 6;
+
+    #region Dependency Properties
+
+    public static readonly DependencyProperty WheelRadiusProperty =
+        DependencyProperty.Register(nameof(WheelRadius), typeof(double), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(280.0, FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.AffectsMeasure));
+
+    public static readonly DependencyProperty CenterRadiusProperty =
+        DependencyProperty.Register(nameof(CenterRadius), typeof(double), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(70.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty AccentColorProperty =
+        DependencyProperty.Register(nameof(AccentColor), typeof(Color), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(Color.FromRgb(0x1F, 0x1B, 0x17), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty HoverColorProperty =
+        DependencyProperty.Register(nameof(HoverColor), typeof(Color), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(Color.FromRgb(0x7A, 0x6A, 0x48), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty BackgroundColorProperty =
+        DependencyProperty.Register(nameof(BackgroundColor), typeof(Color), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(Color.FromArgb(0xE0, 0x14, 0x13, 0x12), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty TrimColorProperty =
+        DependencyProperty.Register(nameof(TrimColor), typeof(Color), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(Color.FromRgb(0xC9, 0xA2, 0x4E), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty TextColorProperty =
+        DependencyProperty.Register(nameof(TextColor), typeof(Color), typeof(RadialMenu),
+            new FrameworkPropertyMetadata(Color.FromRgb(0xF2, 0xEC, 0xDD), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    #endregion
+
+    #region Properties
+
+    public double WheelRadius
+    {
+        get => (double)GetValue(WheelRadiusProperty);
+        set => SetValue(WheelRadiusProperty, value);
+    }
+
+    public double CenterRadius
+    {
+        get => (double)GetValue(CenterRadiusProperty);
+        set => SetValue(CenterRadiusProperty, value);
+    }
+
+    public Color AccentColor
+    {
+        get => (Color)GetValue(AccentColorProperty);
+        set => SetValue(AccentColorProperty, value);
+    }
+
+    public Color HoverColor
+    {
+        get => (Color)GetValue(HoverColorProperty);
+        set => SetValue(HoverColorProperty, value);
+    }
+
+    public Color BackgroundColor
+    {
+        get => (Color)GetValue(BackgroundColorProperty);
+        set => SetValue(BackgroundColorProperty, value);
+    }
+
+    public Color TrimColor
+    {
+        get => (Color)GetValue(TrimColorProperty);
+        set => SetValue(TrimColorProperty, value);
+    }
+
+    public Color TextColor
+    {
+        get => (Color)GetValue(TextColorProperty);
+        set => SetValue(TextColorProperty, value);
+    }
+
+    public bool IsSubMenu { get; set; }
+
+    /// <summary>
+    /// Optional "n / m" page indicator drawn beneath the centre logo.
+    /// Set to null/empty to hide.
+    /// </summary>
+    public string? PageInfo { get; set; }
+
+    #endregion
+
+    #region Fields
+
+    private List<ShortcutItem> _items = new();
+    private int _hoveredIndex = -1;
+    private double _animationProgress = 1.0;
+    private bool _isAnimating;
+
+    public event EventHandler<int>? WedgeClicked;
+    public event EventHandler<int>? WedgeRightClicked;
+    public event EventHandler? CenterClicked;
+
+    #endregion
+
+    public RadialMenu()
+    {
+        SnapsToDevicePixels = true;
+        Focusable = true;
+    }
+
+    public void SetItems(IList<ShortcutItem> items)
+    {
+        _items = items.ToList();
+        _hoveredIndex = -1;
+        InvalidateVisual();
+    }
+
+    public void AnimateIn()
+    {
+        _animationProgress = 0.0;
+        _isAnimating = true;
+        CompositionTarget.Rendering += OnRendering;
+    }
+
+    public void AnimateOut()
+    {
+        _animationProgress = 1.0;
+        _isAnimating = false;
+        CompositionTarget.Rendering -= OnRendering;
+    }
+
+    private void OnRendering(object? sender, EventArgs e)
+    {
+        if (!_isAnimating) return;
+
+        _animationProgress += 0.06; // ~16ms * 16 = 250ms total
+        if (_animationProgress >= 1.0)
+        {
+            _animationProgress = 1.0;
+            _isAnimating = false;
+            CompositionTarget.Rendering -= OnRendering;
+        }
+
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        base.OnRender(dc);
+
+        Point center = new Point(WheelRadius, WheelRadius);
+
+        // Clamp so the wedges always have a non-negative thickness, even on
+        // the very first animation frame (progress = 0). Without this, the
+        // RadialGradientBrush builds fine but `new Rect(..., negative, negative)`
+        // when drawing icons throws ArgumentException and aborts the wedge
+        // loop, leaving only the first wedge visible.
+        double rawRadius = WheelRadius * EaseOutCubic(_animationProgress);
+        double animRadius = Math.Max(CenterRadius + 1, rawRadius);
+
+        // 1) Outer disc backdrop (single dark circle behind everything)
+        DrawBackdrop(dc, center, animRadius);
+
+        // 2) Wedges (real or placeholder)
+        bool hasItems = _items.Count > 0;
+        int wedgeCount = hasItems ? _items.Count : PlaceholderSlots;
+
+        DrawWedges(dc, center, animRadius, wedgeCount, hasItems);
+
+        // 3) Outer ring on top of wedges so the trim looks crisp
+        DrawOuterRing(dc, center, animRadius);
+
+        // 4) Centre disc with logo / hint
+        DrawCenterCircle(dc, center, hasItems);
+
+        // 5) Empty-state hint floating below the centre
+        if (!hasItems)
+        {
+            DrawEmptyHint(dc, center, animRadius);
+        }
+    }
+
+    private void DrawBackdrop(DrawingContext dc, Point center, double r)
+    {
+        var radial = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.5, 0.5),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        radial.GradientStops.Add(new GradientStop(Lighten(BackgroundColor, 0.15), 0.0));
+        radial.GradientStops.Add(new GradientStop(BackgroundColor, 0.7));
+        radial.GradientStops.Add(new GradientStop(Darken(BackgroundColor, 0.2), 1.0));
+        radial.Freeze();
+
+        dc.DrawEllipse(radial, null, center, r, r);
+    }
+
+    private void DrawWedges(DrawingContext dc, Point center, double animRadius, int count, bool hasItems)
+    {
+        // Slightly inset stroke so lines don't disappear behind the outer ring
+        var separatorPen = new Pen(new SolidColorBrush(Color.FromArgb(0x55, 0x00, 0x00, 0x00)), 1.0);
+        separatorPen.Freeze();
+
+        for (int i = 0; i < count; i++)
+        {
+            try
+            {
+                DrawSingleWedge(dc, center, animRadius, i, count, hasItems, separatorPen);
+            }
+            catch (Exception ex)
+            {
+                // Never let one bad wedge kill the rest of the wheel.
+                ShortcutWheel.App.LogError($"Wedge {i} render failed: {ex}");
+            }
+        }
+    }
+
+    private void DrawSingleWedge(DrawingContext dc, Point center, double animRadius,
+        int i, int count, bool hasItems, Pen separatorPen)
+    {
+        double wedgeAngle = 360.0 / count;
+        double startAngle = i * wedgeAngle - 90 - wedgeAngle / 2;
+        double endAngle = startAngle + wedgeAngle;
+
+        var wedge = WedgeGeometry.CreateWedge(center, CenterRadius, animRadius, startAngle, endAngle);
+        bool isHovered = i == _hoveredIndex;
+
+        Brush fill = BuildWedgeFill(center, animRadius, isHovered);
+        dc.DrawGeometry(fill, separatorPen, wedge);
+
+        double midAngle = (startAngle + endAngle) / 2;
+
+        // Number indicator (CSGO has 1..6 near the centre)
+        double numRadius = CenterRadius + Math.Min(22, Math.Max(0, (animRadius - CenterRadius) * 0.12));
+        Point numPos = WedgeGeometry.PolarToCartesian(center, numRadius, midAngle);
+        var numBrush = new SolidColorBrush(isHovered
+            ? TrimColor
+            : Color.FromArgb(0xAA, TrimColor.R, TrimColor.G, TrimColor.B));
+        numBrush.Freeze();
+
+        var num = new FormattedText((i + 1).ToString(),
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                         FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            13, numBrush, 96);
+        dc.DrawText(num, new Point(numPos.X - num.Width / 2, numPos.Y - num.Height / 2));
+
+        if (!hasItems)
+        {
+            DrawPlaceholderLabel(dc, center, animRadius, midAngle);
+            return;
+        }
+
+        // Real items: icon + label
+        var item = _items[i];
+        DrawWedgeContent(dc, item, center, animRadius, midAngle, isHovered);
+    }
+
+    private Brush BuildWedgeFill(Point center, double animRadius, bool hovered)
+    {
+        Color inner = hovered ? Lighten(HoverColor, 0.2) : Lighten(AccentColor, 0.18);
+        Color outer = hovered ? Darken(HoverColor, 0.25)
+                              : Color.FromArgb(0xF0, AccentColor.R, AccentColor.G, AccentColor.B);
+
+        // RadialGradient mapped to the whole wheel: makes the centre look
+        // slightly brighter than the rim, like CSGO's vignette.
+        var brush = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.5, 0.5),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5
+        };
+        brush.GradientStops.Add(new GradientStop(inner, 0.0));
+        brush.GradientStops.Add(new GradientStop(outer, 1.0));
+        brush.Freeze();
+        return brush;
+    }
+
+    private void DrawWedgeContent(DrawingContext dc, ShortcutItem item, Point center,
+        double animRadius, double midAngle, bool isHovered)
+    {
+        double wedgeThickness = Math.Max(0, animRadius - CenterRadius);
+
+        // Icon roughly halfway between centre and rim
+        double iconRadius = CenterRadius + wedgeThickness * 0.50;
+        Point iconPos = WedgeGeometry.PolarToCartesian(center, iconRadius, midAngle);
+
+        if (!string.IsNullOrEmpty(item.TargetPath))
+        {
+            var icon = IconExtractor.ExtractIcon(item.TargetPath, size: 32);
+            if (icon != null)
+            {
+                double iconSize = Math.Min(40, wedgeThickness * 0.30);
+                if (iconSize > 0)
+                {
+                    dc.DrawImage(icon, new Rect(
+                        iconPos.X - iconSize / 2,
+                        iconPos.Y - iconSize / 2 - 6,
+                        iconSize, iconSize));
+                }
+            }
+        }
+
+        // Label slightly outside the icon
+        double textRadius = CenterRadius + wedgeThickness * 0.78;
+        Point textPos = WedgeGeometry.PolarToCartesian(center, textRadius, midAngle);
+        string label = TruncateText(item.Label, 10);
+
+        var labelBrush = new SolidColorBrush(isHovered ? TrimColor : TextColor);
+        labelBrush.Freeze();
+
+        var formattedText = new FormattedText(label,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                         FontStyles.Normal,
+                         isHovered ? FontWeights.Bold : FontWeights.SemiBold,
+                         FontStretches.Normal),
+            16, labelBrush, 96);
+        formattedText.TextAlignment = TextAlignment.Center;
+        formattedText.MaxTextWidth = Math.Max(40, wedgeThickness * 1.3);
+
+        dc.DrawText(formattedText, new Point(
+            textPos.X - formattedText.Width / 2,
+            textPos.Y - formattedText.Height / 2));
+
+        // Sub-menu indicator on the rim
+        if (item.IsFolder)
+        {
+            double arrowRadius = Math.Max(CenterRadius + 2, animRadius - 16);
+            Point arrowPos = WedgeGeometry.PolarToCartesian(center, arrowRadius, midAngle);
+            var arrowBrush = new SolidColorBrush(TrimColor);
+            arrowBrush.Freeze();
+            var arrowText = new FormattedText("›",
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Segoe UI"), 16, arrowBrush, 96);
+            dc.DrawText(arrowText, new Point(arrowPos.X - arrowText.Width / 2, arrowPos.Y - arrowText.Height / 2));
+        }
+    }
+
+    private void DrawPlaceholderLabel(DrawingContext dc, Point center, double animRadius, double midAngle)
+    {
+        double wedgeThickness = Math.Max(0, animRadius - CenterRadius);
+        double textRadius = CenterRadius + wedgeThickness * 0.6;
+        Point textPos = WedgeGeometry.PolarToCartesian(center, textRadius, midAngle);
+
+        var brush = new SolidColorBrush(Color.FromArgb(0x88, TextColor.R, TextColor.G, TextColor.B));
+        brush.Freeze();
+
+        var hint = new FormattedText("拖入此处",
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                         FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            13, brush, 96);
+        dc.DrawText(hint, new Point(textPos.X - hint.Width / 2, textPos.Y - hint.Height / 2));
+    }
+
+    private void DrawOuterRing(DrawingContext dc, Point center, double r)
+    {
+        var trim = new Pen(new SolidColorBrush(Color.FromArgb(0xAA, TrimColor.R, TrimColor.G, TrimColor.B)), 2.5);
+        trim.Freeze();
+        dc.DrawEllipse(null, trim, center, r - 1, r - 1);
+
+        var glow = new Pen(new SolidColorBrush(Color.FromArgb(0x40, TrimColor.R, TrimColor.G, TrimColor.B)), 6);
+        glow.Freeze();
+        dc.DrawEllipse(null, glow, center, r + 2, r + 2);
+    }
+
+    private void DrawCenterCircle(DrawingContext dc, Point center, bool hasItems)
+    {
+        // Subtle vertical gradient on the centre disc – CSGO logo background.
+        var grad = new LinearGradientBrush
+        {
+            StartPoint = new Point(0.5, 0),
+            EndPoint = new Point(0.5, 1)
+        };
+        grad.GradientStops.Add(new GradientStop(Color.FromRgb(0x2A, 0x24, 0x1B), 0.0));
+        grad.GradientStops.Add(new GradientStop(Color.FromRgb(0x10, 0x0E, 0x0C), 1.0));
+        grad.Freeze();
+
+        var ringPen = new Pen(new SolidColorBrush(TrimColor), 2);
+        ringPen.Freeze();
+        dc.DrawEllipse(grad, ringPen, center, CenterRadius - 2, CenterRadius - 2);
+
+        // Centre label: CS-style two-line emblem when at root, ‹ when in submenu.
+        if (IsSubMenu)
+        {
+            var brush = new SolidColorBrush(TrimColor);
+            brush.Freeze();
+            var back = new FormattedText("‹",
+                CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                             FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                CenterRadius * 0.8, brush, 96);
+            dc.DrawText(back, new Point(center.X - back.Width / 2, center.Y - back.Height / 2 - 2));
+        }
+        else
+        {
+            DrawCenterLogo(dc, center);
+        }
+
+        // Optional page indicator just below the centre logo.
+        if (!string.IsNullOrEmpty(PageInfo))
+        {
+            var pageBrush = new SolidColorBrush(Color.FromArgb(0xCC, TrimColor.R, TrimColor.G, TrimColor.B));
+            pageBrush.Freeze();
+            var pageText = new FormattedText(PageInfo,
+                CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                             FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                10, pageBrush, 96);
+            double y = center.Y + CenterRadius - 16;
+            dc.DrawText(pageText, new Point(center.X - pageText.Width / 2, y));
+        }
+    }
+
+    private void DrawCenterLogo(DrawingContext dc, Point center)
+    {
+        var brush = new SolidColorBrush(TrimColor);
+        brush.Freeze();
+
+        // Star glyph as a stand-in for a logo
+        var star = new FormattedText("★",
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface("Segoe UI Symbol"), CenterRadius * 0.55, brush, 96);
+        dc.DrawText(star, new Point(center.X - star.Width / 2, center.Y - star.Height / 2 - 4));
+
+        // Tiny label under the star
+        var labelBrush = new SolidColorBrush(Color.FromArgb(0xCC, TrimColor.R, TrimColor.G, TrimColor.B));
+        labelBrush.Freeze();
+        var label = new FormattedText("ESC",
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"),
+                         FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            10, labelBrush, 96);
+        dc.DrawText(label, new Point(center.X - label.Width / 2, center.Y + CenterRadius * 0.30));
+    }
+
+    private void DrawEmptyHint(DrawingContext dc, Point center, double animRadius)
+    {
+        var titleBrush = new SolidColorBrush(Color.FromArgb(0xDD, TrimColor.R, TrimColor.G, TrimColor.B));
+        titleBrush.Freeze();
+        var title = new FormattedText("将快捷方式拖入扇区",
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                         FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            13, titleBrush, 96);
+
+        double y = center.Y + CenterRadius + Math.Max(0, animRadius - CenterRadius) * 0.10;
+        dc.DrawText(title, new Point(center.X - title.Width / 2, y));
+    }
+
+    private static Color Lighten(Color c, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromArgb(c.A,
+            (byte)(c.R + (255 - c.R) * amount),
+            (byte)(c.G + (255 - c.G) * amount),
+            (byte)(c.B + (255 - c.B) * amount));
+    }
+
+    private static Color Darken(Color c, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromArgb(c.A,
+            (byte)(c.R * (1 - amount)),
+            (byte)(c.G * (1 - amount)),
+            (byte)(c.B * (1 - amount)));
+    }
+
+    private static double EaseOutCubic(double t) => 1.0 - Math.Pow(1.0 - t, 3);
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text ?? "";
+        return text[..(maxLength - 1)] + "…";
+    }
+
+    #region Hit Testing
+
+    public int HitTestWedge(Point mousePos)
+    {
+        Point center = new Point(WheelRadius, WheelRadius);
+        int count = _items.Count > 0 ? _items.Count : PlaceholderSlots;
+        var (index, _) = WedgeGeometry.HitTest(center, CenterRadius, WheelRadius, mousePos, count);
+        return index;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        int idx = HitTestWedge(pos);
+        if (idx != _hoveredIndex)
+        {
+            _hoveredIndex = idx;
+            InvalidateVisual();
+        }
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        int idx = HitTestWedge(pos);
+
+        if (idx == -2)
+        {
+            CenterClicked?.Invoke(this, EventArgs.Empty);
+        }
+        else if (idx >= 0 && idx < _items.Count)
+        {
+            WedgeClicked?.Invoke(this, idx);
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        int idx = HitTestWedge(pos);
+
+        if (idx >= 0 && idx < _items.Count)
+        {
+            WedgeRightClicked?.Invoke(this, idx);
+        }
+        else if (idx == -2)
+        {
+            CenterClicked?.Invoke(this, EventArgs.Empty);
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        _hoveredIndex = -1;
+        InvalidateVisual();
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        double size = WheelRadius * 2;
+        return new Size(size, size);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        double size = WheelRadius * 2;
+        return new Size(size, size);
+    }
+
+    #endregion
+}

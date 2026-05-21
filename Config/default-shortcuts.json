@@ -1,0 +1,52 @@
+[
+  {
+    "id": "root-calc",
+    "label": "Calculator",
+    "targetPath": "calc.exe",
+    "children": [],
+    "colorOverride": null
+  },
+  {
+    "id": "root-notepad",
+    "label": "Notepad",
+    "targetPath": "notepad.exe",
+    "children": [],
+    "colorOverride": null
+  },
+  {
+    "id": "root-cmd",
+    "label": "Command Prompt",
+    "targetPath": "cmd.exe",
+    "children": [],
+    "colorOverride": null
+  },
+  {
+    "id": "root-explorer",
+    "label": "File Explorer",
+    "targetPath": "explorer.exe",
+    "children": [],
+    "colorOverride": null
+  },
+  {
+    "id": "root-dev",
+    "label": "Development",
+    "targetPath": null,
+    "children": [
+      {
+        "id": "dev-code",
+        "label": "VS Code",
+        "targetPath": "code",
+        "children": [],
+        "colorOverride": null
+      },
+      {
+        "id": "dev-settings",
+        "label": "Settings",
+        "targetPath": "ms-settings:",
+        "children": [],
+        "colorOverride": null
+      }
+    ],
+    "colorOverride": null
+  }
+]

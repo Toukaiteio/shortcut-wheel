@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# NuGet
+packages/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Runtime logs
+*.log
+
+# User config (personal shortcuts — not committed)
+Config/shortcuts.json

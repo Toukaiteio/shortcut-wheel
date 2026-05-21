@@ -1,0 +1,65 @@
+<Window x:Class="ShortcutWheel.Views.StartupToast"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="Manual"
+        ShowActivated="False"
+        Focusable="False"
+        IsHitTestVisible="False"
+        UseLayoutRounding="True"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.BitmapScalingMode="HighQuality">
+    <Grid>
+        <!-- Outer thin gold halo: pure stroke, no DropShadowEffect (which
+             forces software rendering on transparent windows and is the
+             cause of the "gray flash") -->
+        <Border CornerRadius="12"
+                Margin="2"
+                BorderThickness="3"
+                BorderBrush="#33C9A24E"
+                Background="Transparent" />
+
+        <!-- Main panel: a single solid color, NOT a gradient.
+             Solid SolidColorBrush composites in one pass. -->
+        <Border x:Name="MainPanel"
+                CornerRadius="10"
+                Margin="4"
+                Padding="18,14"
+                BorderThickness="2"
+                BorderBrush="#C9A24E"
+                Background="#F2181410">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="SlideTransform" X="0" Y="0" />
+            </Border.RenderTransform>
+            <StackPanel Orientation="Horizontal" MinWidth="320">
+                <TextBlock Text="★"
+                           FontSize="36"
+                           Foreground="#C9A24E"
+                           VerticalAlignment="Center"
+                           Margin="0,0,14,0" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="TitleText"
+                               Text="快捷转盘 已启动"
+                               Foreground="#C9A24E"
+                               FontFamily="Microsoft YaHei UI"
+                               FontSize="16"
+                               FontWeight="Bold" />
+                    <TextBlock x:Name="BodyText"
+                               Text="按 Ctrl+Alt+Space 呼出转盘"
+                               Foreground="#F2ECDD"
+                               FontFamily="Microsoft YaHei UI"
+                               FontSize="12"
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               MaxWidth="320" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
