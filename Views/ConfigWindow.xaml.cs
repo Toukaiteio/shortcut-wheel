@@ -13,7 +13,7 @@ namespace ShortcutWheel.Views;
 public partial class ConfigWindow : Window
 {
     private readonly ConfigService _configService;
-    private readonly List<ShortcutItemViewModel> _viewModels = new();
+    private readonly System.Collections.ObjectModel.ObservableCollection<ShortcutItemViewModel> _viewModels = new();
     private ShortcutItemViewModel? _selectedItem;
 
     // Slider/CheckBox/TextBox events fire during InitializeComponent() and
@@ -51,6 +51,11 @@ public partial class ConfigWindow : Window
         _configService = configService;
         InitializeComponent();
 
+        // Bind the TreeView to our ObservableCollection so any add/remove
+        // is reflected in the UI automatically — no parallel ShortcutTree.Items
+        // bookkeeping that can drift out of sync.
+        ShortcutTree.ItemsSource = _viewModels;
+
         Loaded += OnLoaded;
     }
 
@@ -64,13 +69,11 @@ public partial class ConfigWindow : Window
     private void LoadShortcuts()
     {
         _viewModels.Clear();
-        ShortcutTree.Items.Clear();
 
         foreach (var item in _configService.Config.RootItems)
         {
             var vm = new ShortcutItemViewModel(item);
             _viewModels.Add(vm);
-            ShortcutTree.Items.Add(vm);
         }
     }
 
@@ -197,7 +200,6 @@ public partial class ConfigWindow : Window
             _configService.Config.RootItems.Add(item);
             newVm = new ShortcutItemViewModel(item);
             _viewModels.Add(newVm);
-            ShortcutTree.Items.Add(newVm);
         }
 
         // Defer to the next layout pass so the TreeView has had a chance to
@@ -267,10 +269,11 @@ public partial class ConfigWindow : Window
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes) return;
 
-        RemoveItem(_selectedItem.Item);
-        LoadShortcuts();
+        var deleted = _selectedItem;
+        RemoveViewModel(deleted);
+
         _configService.Save();
-        UpdateStatus($"Deleted: {_selectedItem.Label}");
+        UpdateStatus($"Deleted: {deleted.Label}");
         _selectedItem = null;
 
         PropLabel.Text = "";
@@ -279,26 +282,38 @@ public partial class ConfigWindow : Window
         PropWorkDir.Text = "";
     }
 
-    private void RemoveItem(ShortcutItem item)
+    /// <summary>
+    /// Removes <paramref name="vm"/> from its parent ViewModel collection
+    /// (which also removes it from the underlying model). Uses incremental
+    /// ObservableCollection updates so other tree nodes keep their expanded
+    /// state — unlike a full LoadShortcuts() rebuild.
+    /// </summary>
+    private void RemoveViewModel(ShortcutItemViewModel vm)
     {
-        _configService.Config.RootItems.Remove(item);
-
-        foreach (var root in _configService.Config.RootItems)
+        // Root-level item?
+        if (_viewModels.Contains(vm))
         {
-            if (RemoveFromChildren(root, item))
-                break;
+            _configService.Config.RootItems.Remove(vm.Item);
+            _viewModels.Remove(vm);
+            return;
         }
+
+        // Otherwise find its parent in the VM tree and use RemoveChild so
+        // both collections (model + viewmodel) stay in sync.
+        var parent = FindParentViewModel(_viewModels, vm);
+        parent?.RemoveChild(vm);
     }
 
-    private static bool RemoveFromChildren(ShortcutItem parent, ShortcutItem target)
+    private static ShortcutItemViewModel? FindParentViewModel(
+        IEnumerable<ShortcutItemViewModel> roots, ShortcutItemViewModel target)
     {
-        if (parent.Children.Remove(target)) return true;
-        foreach (var child in parent.Children)
+        foreach (var root in roots)
         {
-            if (RemoveFromChildren(child, target))
-                return true;
+            if (root.Children.Contains(target)) return root;
+            var deeper = FindParentViewModel(root.Children, target);
+            if (deeper != null) return deeper;
         }
-        return false;
+        return null;
     }
 
     private void PropBrowse_Click(object sender, RoutedEventArgs e)
@@ -353,23 +368,12 @@ public partial class ConfigWindow : Window
     /// </summary>
     private static ShortcutItem CreateItemFromPath(string path)
     {
+        // Do NOT call ShortcutResolver synchronously here — IShellLinkW.Load
+        // can block the UI thread for seconds (or hang indefinitely) when
+        // the .lnk points at a slow/missing/network target. Store the .lnk
+        // path itself; LaunchService resolves it lazily at launch time, and
+        // SHGetFileInfo will pick up the .lnk's own icon for display.
         string label = System.IO.Path.GetFileNameWithoutExtension(path);
-
-        if (ShortcutResolver.IsShortcut(path))
-        {
-            var info = ShortcutResolver.Resolve(path);
-            if (info != null)
-            {
-                return new ShortcutItem
-                {
-                    Label = label,
-                    TargetPath = info.TargetPath,
-                    Arguments = info.Arguments,
-                    WorkingDirectory = info.WorkingDirectory
-                };
-            }
-        }
-
         return new ShortcutItem
         {
             Label = label,
@@ -538,6 +542,22 @@ public partial class ConfigWindow : Window
     {
         _dragStartPoint = e.GetPosition(null);
         _pendingDragItem = GetItemFromMouse(e.OriginalSource);
+
+        // Click on empty area inside the tree clears the selection so that
+        // subsequent "+ Add Folder / + Add File" actions go to the root level
+        // instead of inside the previously-selected folder.
+        if (_pendingDragItem == null && _selectedItem != null)
+        {
+            var c = FindTreeViewItem(ShortcutTree, _selectedItem);
+            if (c != null) c.IsSelected = false;
+            _selectedItem = null;
+            PropLabel.Text = "";
+            PropTargetPath.Text = "";
+            PropArguments.Text = "";
+            PropWorkDir.Text = "";
+            PropIsFolder.IsChecked = false;
+            PropHasChildren.IsChecked = false;
+        }
     }
 
     private void ShortcutTree_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -566,6 +586,14 @@ public partial class ConfigWindow : Window
 
     private void ShortcutTree_DragOver(object sender, DragEventArgs e)
     {
+        // External file drop from Explorer
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) || e.Data.GetDataPresent(DataFormats.Text))
+        {
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+            return;
+        }
+
         if (!e.Data.GetDataPresent(ItemDataFormat))
         {
             e.Effects = DragDropEffects.None;
@@ -625,6 +653,28 @@ public partial class ConfigWindow : Window
     {
         ClearDropIndicator();
 
+        // ── External file drop ──────────────────────────────────────────────
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) || e.Data.GetDataPresent(DataFormats.Text))
+        {
+            string[]? files = e.Data.GetDataPresent(DataFormats.FileDrop)
+                ? e.Data.GetData(DataFormats.FileDrop) as string[]
+                : new[] { e.Data.GetData(DataFormats.Text) as string ?? "" };
+
+            if (files != null)
+            {
+                foreach (var path in files.Where(p => !string.IsNullOrEmpty(p)))
+                {
+                    var item = CreateItemFromPath(path);
+                    AddItemUnderSelection(item);
+                }
+                _configService.Save();
+                UpdateStatus($"已添加 {files.Length} 个项目 / Added {files.Length} item(s)");
+            }
+            e.Handled = true;
+            return;
+        }
+
+        // ── Internal tree reorder ───────────────────────────────────────────
         if (!e.Data.GetDataPresent(ItemDataFormat))
         {
             e.Handled = true;
@@ -701,60 +751,75 @@ public partial class ConfigWindow : Window
                              ShortcutItemViewModel? targetVm,
                              DropIndicatorAdorner.DropPosition position)
     {
-        // Drop in empty space → append to root.
+        // WPF's ItemContainerGenerator can corrupt when the same VM instance
+        // is re-parented across the hierarchy (item appears blank or vanishes).
+        // We always create a fresh VM around the same underlying model, so
+        // the TreeView builds a brand-new TreeViewItem for the new location.
+        var sourceModel = dragged.Item;
+
+        // Detach from current parent (vm + model in one step).
+        DetachFromCurrentParent(dragged);
+
+        var movedVm = new ShortcutItemViewModel(sourceModel);
+
+        // ── Drop in empty space → append to root ───────────────────────────
         if (targetVm == null)
         {
-            DetachFromCurrentParent(dragged);
-            _viewModels.Add(dragged);
-            ShortcutTree.Items.Add(dragged);
-            _configService.Config.RootItems.Add(dragged.Item);
+            _viewModels.Add(movedVm);
+            _configService.Config.RootItems.Add(sourceModel);
+            SelectAfterLayout(movedVm);
             return;
         }
 
+        // ── Drop INTO a folder ─────────────────────────────────────────────
         if (position == DropIndicatorAdorner.DropPosition.Into)
         {
-            // Move INTO the target folder.
-            DetachFromCurrentParent(dragged);
-            targetVm.AddChild(dragged.Item);
-            // AddChild created a fresh VM around the same model. Replace it
-            // so we keep the original VM identity (selection / state).
-            // Cheaper alternative: remove the AddChild-spawned VM and add
-            // the existing one directly.
-            var spawned = targetVm.Children[^1];
-            if (!ReferenceEquals(spawned, dragged))
-            {
-                targetVm.Children.RemoveAt(targetVm.Children.Count - 1);
-                targetVm.Children.Add(dragged);
-            }
+            targetVm.Item.Children.Add(sourceModel);
+            targetVm.Children.Add(movedVm);
+            SelectAfterLayout(movedVm);
             return;
         }
 
-        // Before / After at the target's siblings level.
-        var (targetParentVm, targetSiblingsVms, targetSiblingsItems) = GetSiblings(targetVm);
+        // ── Drop BEFORE / AFTER target ─────────────────────────────────────
+        var (_, targetSiblingsVms, targetSiblingsItems) = GetSiblings(targetVm);
         int targetIdx = targetSiblingsVms.IndexOf(targetVm);
-        if (targetIdx < 0) return;
+        if (targetIdx < 0)
+        {
+            // Defensive fallback: append to root.
+            _viewModels.Add(movedVm);
+            _configService.Config.RootItems.Add(sourceModel);
+            SelectAfterLayout(movedVm);
+            return;
+        }
 
         int insertIdx = position == DropIndicatorAdorner.DropPosition.After
             ? targetIdx + 1
             : targetIdx;
 
-        var (sourceParentVm, sourceSiblingsVms, sourceSiblingsItems) = GetSiblings(dragged);
-        int sourceIdx = sourceSiblingsVms.IndexOf(dragged);
+        targetSiblingsVms.Insert(insertIdx, movedVm);
+        targetSiblingsItems.Insert(insertIdx, sourceModel);
+        SelectAfterLayout(movedVm);
+    }
 
-        bool sameLevel = ReferenceEquals(sourceSiblingsVms, targetSiblingsVms);
-
-        // Detach from source FIRST so index math for same-parent moves works.
-        if (sourceIdx >= 0)
+    /// <summary>
+    /// Selects <paramref name="vm"/> after the next layout pass so the
+    /// TreeView has had a chance to realise its container.
+    /// </summary>
+    private void SelectAfterLayout(ShortcutItemViewModel vm)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
         {
-            sourceSiblingsVms.RemoveAt(sourceIdx);
-            sourceSiblingsItems.RemoveAt(sourceIdx);
-
-            if (sameLevel && sourceIdx < insertIdx)
-                insertIdx--;
-        }
-
-        targetSiblingsVms.Insert(insertIdx, dragged);
-        targetSiblingsItems.Insert(insertIdx, dragged.Item);
+            var c = FindTreeViewItem(ShortcutTree, vm);
+            if (c != null)
+            {
+                c.IsSelected = true;
+                c.BringIntoView();
+            }
+            else
+            {
+                _selectedItem = vm;
+            }
+        }), System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private (ShortcutItemViewModel? parent,
@@ -803,18 +868,15 @@ public partial class ConfigWindow : Window
             siblingVms.RemoveAt(idx);
             siblingItems.RemoveAt(idx);
         }
-
-        // _viewModels and ShortcutTree.Items are kept in lock-step at root.
-        if (parent == null)
-        {
-            ShortcutTree.Items.Remove(item);
-        }
+        // ShortcutTree is bound to _viewModels via ItemsSource, so removing
+        // from _viewModels is enough — no second collection to keep in sync.
     }
 
     private static bool IsDescendant(ShortcutItemViewModel maybeDescendant, ShortcutItemViewModel ancestor)
     {
-        // Returns true if maybeDescendant is anywhere in ancestor's subtree.
-        if (ReferenceEquals(maybeDescendant, ancestor)) return true;
+        // Compare by underlying model: VMs may be transient (recreated on
+        // every move) while models stay stable for the lifetime of the item.
+        if (ReferenceEquals(maybeDescendant.Item, ancestor.Item)) return true;
         foreach (var child in ancestor.Children)
         {
             if (IsDescendant(maybeDescendant, child)) return true;

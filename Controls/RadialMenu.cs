@@ -127,9 +127,9 @@ public class RadialMenu : FrameworkElement
     public void SetItems(IList<ShortcutItem> items)
     {
         _items = items.ToList();
-        // Re-evaluate hover based on current mouse position so that
-        // entering a sub-menu while the cursor is already over a wedge
-        // shows the hover highlight immediately (without requiring movement).
+        // Pre-warm icon cache so OnRender never triggers a load itself.
+        IconExtractor.Prefetch(_items.Select(i => i.TargetPath));
+        // Re-evaluate hover based on current mouse position.
         var mousePos = Mouse.GetPosition(this);
         _hoveredIndex = HitTestWedge(mousePos);
         InvalidateVisual();
@@ -315,7 +315,8 @@ public class RadialMenu : FrameworkElement
 
         if (!string.IsNullOrEmpty(item.TargetPath))
         {
-            var icon = IconExtractor.ExtractIcon(item.TargetPath, size: 32);
+            var icon = IconExtractor.GetCached(item.TargetPath, () =>
+                Application.Current?.Dispatcher.Invoke(InvalidateVisual));
             if (icon != null)
             {
                 double iconSize = Math.Min(40, wedgeThickness * 0.30);
