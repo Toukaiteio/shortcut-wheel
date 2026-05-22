@@ -87,9 +87,12 @@ public static class IconExtractor
     {
         try
         {
+            // Step 1: get the system icon index for this file via SHGetFileInfo.
+            // SHGFI_SYSICONINDEX returns the index into the system image list
+            // without extracting an HICON, so it works for any path including
+            // ones that don't exist on disk (USEFILEATTRIBUTES).
             var shfi = new NativeMethods.SHFILEINFO();
-            uint flags = NativeMethods.SHGFI_ICON | NativeMethods.SHGFI_SMALLICON |
-                         NativeMethods.SHGFI_USEFILEATTRIBUTES;
+            uint flags = NativeMethods.SHGFI_SYSICONINDEX | NativeMethods.SHGFI_USEFILEATTRIBUTES;
 
             IntPtr result = NativeMethods.SHGetFileInfo(
                 filePath,
@@ -98,20 +101,27 @@ public static class IconExtractor
                 (uint)Marshal.SizeOf(shfi),
                 flags);
 
-            if (result == IntPtr.Zero || shfi.hIcon == IntPtr.Zero)
-                return null;
+            if (result == IntPtr.Zero) return null;
+            int iconIndex = shfi.iIcon;
+
+            // Step 2: retrieve the JUMBO (256×256) image list and extract the icon.
+            var iid = NativeMethods.IID_IImageList;
+            int hr = NativeMethods.SHGetImageList(NativeMethods.SHIL_JUMBO, ref iid, out var imageList);
+            if (hr != 0 || imageList == null) return null;
+
+            hr = imageList.GetIcon(iconIndex, 0x00000001 /* ILD_TRANSPARENT */, out IntPtr hIcon);
+            if (hr != 0 || hIcon == IntPtr.Zero) return null;
 
             try
             {
-                // We ARE on the STA thread — safe to call directly.
                 var bmp = Imaging.CreateBitmapSourceFromHIcon(
-                    shfi.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                bmp.Freeze(); // must Freeze before crossing thread boundary
+                    hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                bmp.Freeze();
                 return bmp;
             }
             finally
             {
-                NativeMethods.DestroyIcon(shfi.hIcon);
+                NativeMethods.DestroyIcon(hIcon);
             }
         }
         catch
@@ -125,8 +135,7 @@ public static class IconExtractor
         try
         {
             var shfi = new NativeMethods.SHFILEINFO();
-            uint flags = NativeMethods.SHGFI_ICON | NativeMethods.SHGFI_SMALLICON |
-                         NativeMethods.SHGFI_USEFILEATTRIBUTES;
+            uint flags = NativeMethods.SHGFI_SYSICONINDEX | NativeMethods.SHGFI_USEFILEATTRIBUTES;
 
             IntPtr result = NativeMethods.SHGetFileInfo(
                 "file.exe",
@@ -135,18 +144,24 @@ public static class IconExtractor
                 (uint)Marshal.SizeOf(shfi),
                 flags);
 
-            if (result != IntPtr.Zero && shfi.hIcon != IntPtr.Zero)
+            if (result != IntPtr.Zero)
             {
-                try
+                var iid = NativeMethods.IID_IImageList;
+                int hr = NativeMethods.SHGetImageList(NativeMethods.SHIL_JUMBO, ref iid, out var imageList);
+                if (hr == 0 && imageList != null)
                 {
-                    var bmp = Imaging.CreateBitmapSourceFromHIcon(
-                        shfi.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                    bmp.Freeze();
-                    return bmp;
-                }
-                finally
-                {
-                    NativeMethods.DestroyIcon(shfi.hIcon);
+                    hr = imageList.GetIcon(shfi.iIcon, 0x00000001, out IntPtr hIcon);
+                    if (hr == 0 && hIcon != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            var bmp = Imaging.CreateBitmapSourceFromHIcon(
+                                hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                            bmp.Freeze();
+                            return bmp;
+                        }
+                        finally { NativeMethods.DestroyIcon(hIcon); }
+                    }
                 }
             }
         }

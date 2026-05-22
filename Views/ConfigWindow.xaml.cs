@@ -114,6 +114,18 @@ public partial class ConfigWindow : Window
         // General
         SetStartWithWindows.IsChecked = settings.StartWithWindows;
         SetRunMinimized.IsChecked = settings.RunMinimized;
+
+        // Update section
+        SetCurrentVersion.Text = "v" + Services.UpdateService.GetCurrentVersion();
+        SetAutoUpdate.IsChecked = settings.AutoUpdateEnabled;
+        SetSilentUpdate.IsChecked = settings.SilentUpdate;
+        SetUpdateStatus.Text = "";
+
+        // Background image
+        SetBgImagePath.Text = settings.BackgroundImagePath ?? "";
+        SetBgImageOpacity.Value = settings.BackgroundImageOpacity;
+        SetBgImageOpacityLabel.Text = settings.BackgroundImageOpacity.ToString("F2");
+        ApplyConfigBgImage(settings);
     }
 
     private void ShortcutTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -159,10 +171,7 @@ public partial class ConfigWindow : Window
 
         if (dialog.ShowDialog() == true)
         {
-            var item = CreateItemFromPath(dialog.FileName);
-            AddItemUnderSelection(item);
-            _configService.Save();
-            UpdateStatus($"已添加 / Added: {item.Label}");
+            AddItemsFromPaths(new[] { dialog.FileName });
         }
     }
 
@@ -270,16 +279,16 @@ public partial class ConfigWindow : Window
         if (result != MessageBoxResult.Yes) return;
 
         var deleted = _selectedItem;
+        // Clear _selectedItem BEFORE removing so SelectedItemChanged (which
+        // fires during RemoveViewModel when the TreeView reacts to the
+        // collection change) is not overwritten by our explicit null below.
+        _selectedItem = null;
         RemoveViewModel(deleted);
 
         _configService.Save();
         UpdateStatus($"Deleted: {deleted.Label}");
-        _selectedItem = null;
-
-        PropLabel.Text = "";
-        PropTargetPath.Text = "";
-        PropArguments.Text = "";
-        PropWorkDir.Text = "";
+        // Do NOT set _selectedItem = null here — SelectedItemChanged has
+        // already updated it (to null or to whatever the TreeView auto-selected).
     }
 
     /// <summary>
@@ -368,17 +377,52 @@ public partial class ConfigWindow : Window
     /// </summary>
     private static ShortcutItem CreateItemFromPath(string path)
     {
-        // Do NOT call ShortcutResolver synchronously here — IShellLinkW.Load
-        // can block the UI thread for seconds (or hang indefinitely) when
-        // the .lnk points at a slow/missing/network target. Store the .lnk
-        // path itself; LaunchService resolves it lazily at launch time, and
-        // SHGetFileInfo will pick up the .lnk's own icon for display.
-        string label = System.IO.Path.GetFileNameWithoutExtension(path);
+        // Return a placeholder immediately; caller will resolve .lnk async.
         return new ShortcutItem
         {
-            Label = label,
+            Label = System.IO.Path.GetFileNameWithoutExtension(path),
             TargetPath = path
         };
+    }
+
+    /// <summary>
+    /// Adds item(s) from file paths, resolving .lnk files asynchronously
+    /// so the UI thread is never blocked.
+    /// </summary>
+    private async void AddItemsFromPaths(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            ShortcutItem item;
+            if (ShortcutResolver.IsShortcut(path))
+            {
+                var info = await ShortcutResolver.ResolveAsync(path);
+                item = info != null
+                    ? new ShortcutItem
+                    {
+                        Label = System.IO.Path.GetFileNameWithoutExtension(path),
+                        TargetPath = info.TargetPath,
+                        Arguments = info.Arguments,
+                        WorkingDirectory = info.WorkingDirectory
+                    }
+                    : new ShortcutItem
+                    {
+                        Label = System.IO.Path.GetFileNameWithoutExtension(path),
+                        TargetPath = path
+                    };
+            }
+            else
+            {
+                item = new ShortcutItem
+                {
+                    Label = System.IO.Path.GetFileNameWithoutExtension(path),
+                    TargetPath = path
+                };
+            }
+            AddItemUnderSelection(item);
+        }
+        _configService.Save();
+        UpdateStatus($"已添加 / Added {paths.Count()} item(s)");
     }
 
     private void PropChanged(object sender, RoutedEventArgs e)
@@ -529,6 +573,124 @@ public partial class ConfigWindow : Window
         }
     }
 
+    private void SetBgImagePath_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        var path = string.IsNullOrWhiteSpace(SetBgImagePath.Text) ? null : SetBgImagePath.Text.Trim();
+        _configService.Config.Settings.BackgroundImagePath = path;
+        _configService.SaveDebounced();
+        ApplyConfigBgImage(_configService.Config.Settings);
+    }
+
+    private void SetBgImageOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SetBgImageOpacityLabel != null)
+            SetBgImageOpacityLabel.Text = e.NewValue.ToString("F2");
+        if (!_isLoaded) return;
+        _configService.Config.Settings.BackgroundImageOpacity = e.NewValue;
+        _configService.SaveDebounced();
+        ApplyConfigBgImage(_configService.Config.Settings);
+    }
+
+    private void ApplyConfigBgImage(Models.AppSettings settings)
+    {
+        var path = settings.BackgroundImagePath;
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+        {
+            ConfigBgImage.Visibility = System.Windows.Visibility.Collapsed;
+            return;
+        }
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(path, UriKind.Absolute);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            ConfigBgImage.Source = bmp;
+            ConfigBgImage.Opacity = Math.Clamp(settings.BackgroundImageOpacity, 0, 1);
+            ConfigBgImage.Visibility = System.Windows.Visibility.Visible;
+        }
+        catch
+        {
+            ConfigBgImage.Visibility = System.Windows.Visibility.Collapsed;
+        }
+    }
+
+    private void BtnBrowseBgImage_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "选择背景图 / Select background image",
+            Filter = "图片文件 / Images (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files (*.*)|*.*"
+        };
+        if (dlg.ShowDialog() == true)
+            SetBgImagePath.Text = dlg.FileName;
+    }
+
+    private void BtnClearBgImage_Click(object sender, RoutedEventArgs e)
+    {
+        SetBgImagePath.Text = "";
+    }
+
+    private void SetAutoUpdate_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        _configService.Config.Settings.AutoUpdateEnabled = SetAutoUpdate.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
+    private void SetSilentUpdate_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        _configService.Config.Settings.SilentUpdate = SetSilentUpdate.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
+    private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        BtnCheckUpdate.IsEnabled = false;
+        SetUpdateStatus.Text = "正在检查... / Checking...";
+        try
+        {
+            var svc = new Services.UpdateService();
+            var info = await svc.CheckForUpdatesAsync();
+            if (info != null)
+            {
+                SetUpdateStatus.Text = $"发现新版本 / New version: {info.TagName}";
+                var dlg = new UpdateWindow(svc, info) { Owner = this };
+                dlg.Show();
+            }
+            else
+            {
+                SetUpdateStatus.Text = $"已是最新 / Up to date (v{Services.UpdateService.GetCurrentVersion()})";
+            }
+        }
+        catch (Exception ex)
+        {
+            SetUpdateStatus.Text = $"检查失败 / Failed: {ex.Message}";
+        }
+        finally
+        {
+            BtnCheckUpdate.IsEnabled = true;
+        }
+    }
+
+    private void Hyperlink_RequestNavigate(object sender,
+        System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri, UseShellExecute = true
+            });
+        }
+        catch { }
+        e.Handled = true;
+    }
+
     #endregion
 
     private void UpdateStatus(string message)
@@ -662,13 +824,7 @@ public partial class ConfigWindow : Window
 
             if (files != null)
             {
-                foreach (var path in files.Where(p => !string.IsNullOrEmpty(p)))
-                {
-                    var item = CreateItemFromPath(path);
-                    AddItemUnderSelection(item);
-                }
-                _configService.Save();
-                UpdateStatus($"已添加 {files.Length} 个项目 / Added {files.Length} item(s)");
+                AddItemsFromPaths(files.Where(p => !string.IsNullOrEmpty(p))!);
             }
             e.Handled = true;
             return;

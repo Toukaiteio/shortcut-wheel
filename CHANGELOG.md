@@ -2,6 +2,53 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.3.0] - 2026-05-22
+
+### Added
+- Background image support: set any image as the wheel backdrop with adjustable
+  opacity (default 0.4). Image is displayed as a perfect circle matching the
+  wheel radius, with the same expand animation as the wheel itself.
+- Background image also applies to the config window for a unified look.
+- Settings page redesigned as a two-column responsive layout — no more large
+  empty area on the right side.
+- Update section in settings: current version display, manual "Check for
+  updates" button with inline status, auto-update toggle, and silent update
+  toggle (auto-download and install without any prompt).
+- About card in settings with GitHub link.
+- Fullscreen app detection: auto-update popup is deferred until the fullscreen
+  app exits (polls every 5 min, gives up after 2 h).
+- Wheel Opacity setting now actually applied to the OverlayWindow.
+
+### Fixed
+- .lnk shortcut import and launch no longer freezes/crashes the app. Replaced
+  IShellLinkW COM calls (which block on slow/network targets) with WScript.Shell
+  via reflection running on a background thread with a 3-second timeout.
+- Startup migration: all existing .lnk TargetPaths in the config are
+  automatically resolved to real exe paths in the background on first launch.
+- Folder arrow indicator (›) was rendered at the wheel rim in random positions;
+  now drawn inline to the right of the label text.
+- Icon quality improved from 16×16 (SHGFI_SMALLICON) to 256×256 (SHIL_JUMBO
+  via SHGetImageList), matching desktop icon sharpness.
+- Items in the top wedge were rendered too high (outside the disc) due to a
+  fixed upward offset on the icon; icon and label are now anchored together
+  from a single radial point with ClampInsideWheel applied.
+- Wedge label text now has a 1px dark shadow for readability over background
+  images.
+- Wheel and config window cards are semi-transparent when a background image
+  is set, so the image shows through both surfaces consistently.
+- OverlayWindow is pre-warmed at startup (invisible Show/Hide) so the
+  background image renders correctly on the very first wheel open.
+- Background image clip changed from EllipseGeometry/OpacityMask (both
+  produced ellipses due to layout timing) to Ellipse+ImageBrush+ScaleTransform,
+  which is always a perfect circle regardless of layout state.
+- Deleting a shortcut then immediately clicking delete again did nothing because
+  _selectedItem was overwritten after SelectedItemChanged fired during removal.
+- Dragging a file onto the wheel from Explorer closed the wheel immediately
+  (Window_Deactivated fired during drag); fixed with _externalDragActive guard.
+- Config window TreeView now bound via ItemsSource to ObservableCollection,
+  eliminating the parallel ShortcutTree.Items bookkeeping that caused
+  duplicate-item and disappearing-item bugs on drag-and-drop.
+
 ## [0.2.3] - 2026-05-22
 
 ### Fixed

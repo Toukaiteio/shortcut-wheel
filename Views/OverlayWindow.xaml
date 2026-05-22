@@ -21,6 +21,19 @@
           DragOver="LayoutRoot_DragOver"
           DragLeave="LayoutRoot_DragLeave"
           Drop="LayoutRoot_Drop">
+        <!-- Background image: Ellipse with ImageBrush fill — geometric circle, no clip needed -->
+        <Ellipse x:Name="BgEllipse"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 Visibility="Collapsed"
+                 RenderTransformOrigin="0.5,0.5">
+            <Ellipse.Fill>
+                <ImageBrush x:Name="BgImageBrush" Stretch="UniformToFill" />
+            </Ellipse.Fill>
+            <Ellipse.RenderTransform>
+                <ScaleTransform x:Name="BgEllipseScale" ScaleX="0" ScaleY="0" />
+            </Ellipse.RenderTransform>
+        </Ellipse>
         <controls:RadialMenu x:Name="RadialMenuControl"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center" />

@@ -22,4 +22,9 @@ public class AppSettings
     public bool ShowTooltips { get; set; } = true;
     public bool StartWithWindows { get; set; } = false;
     public bool RunMinimized { get; set; } = true;
+    public bool AutoUpdateEnabled { get; set; } = true;
+    public bool SilentUpdate { get; set; } = false;
+
+    public string? BackgroundImagePath { get; set; }
+    public double BackgroundImageOpacity { get; set; } = 0.4;
 }

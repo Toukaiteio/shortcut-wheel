@@ -97,6 +97,7 @@ public class RadialMenu : FrameworkElement
     }
 
     public bool IsSubMenu { get; set; }
+    public bool HasBackgroundImage { get; set; }
 
     /// <summary>
     /// Optional "n / m" page indicator drawn beneath the centre logo.
@@ -112,6 +113,8 @@ public class RadialMenu : FrameworkElement
     private int _hoveredIndex = -1;
     private double _animationProgress = 1.0;
     private bool _isAnimating;
+
+    public double AnimationProgress => _animationProgress;
 
     public event EventHandler<int>? WedgeClicked;
     public event EventHandler? CenterClicked;
@@ -178,8 +181,10 @@ public class RadialMenu : FrameworkElement
         double rawRadius = WheelRadius * EaseOutCubic(_animationProgress);
         double animRadius = Math.Max(CenterRadius + 1, rawRadius);
 
-        // 1) Outer disc backdrop (single dark circle behind everything)
-        DrawBackdrop(dc, center, animRadius);
+        // 1) Outer disc backdrop — skip when a background image is showing
+        //    so the image is visible through the (semi-transparent) wedges.
+        if (!HasBackgroundImage)
+            DrawBackdrop(dc, center, animRadius);
 
         // 2) Wedges (real or placeholder)
         bool hasItems = _items.Count > 0;
@@ -285,12 +290,18 @@ public class RadialMenu : FrameworkElement
 
     private Brush BuildWedgeFill(Point center, double animRadius, bool hovered)
     {
+        // When a background image is showing, make wedges semi-transparent so
+        // the image is visible through them — matching the config window cards.
+        byte alpha = HasBackgroundImage ? (byte)0xCC : (byte)0xFF;
+
         Color inner = hovered ? Lighten(HoverColor, 0.2) : Lighten(AccentColor, 0.18);
         Color outer = hovered ? Darken(HoverColor, 0.25)
                               : Color.FromArgb(0xF0, AccentColor.R, AccentColor.G, AccentColor.B);
 
-        // RadialGradient mapped to the whole wheel: makes the centre look
-        // slightly brighter than the rim, like CSGO's vignette.
+        // Apply the background-image alpha override.
+        inner = Color.FromArgb(alpha, inner.R, inner.G, inner.B);
+        outer = Color.FromArgb((byte)Math.Min(alpha, outer.A), outer.R, outer.G, outer.B);
+
         var brush = new RadialGradientBrush
         {
             GradientOrigin = new Point(0.5, 0.5),
@@ -308,37 +319,31 @@ public class RadialMenu : FrameworkElement
         double animRadius, double midAngle, bool isHovered)
     {
         double wedgeThickness = Math.Max(0, animRadius - CenterRadius);
+        double iconSize = Math.Min(40, wedgeThickness * 0.30);
 
-        // Icon roughly halfway between centre and rim
-        double iconRadius = CenterRadius + wedgeThickness * 0.50;
-        Point iconPos = WedgeGeometry.PolarToCartesian(center, iconRadius, midAngle);
+        // Content anchor: a point in the middle of the wedge, clamped inside
+        // the disc so neither icon nor label can escape the rim.
+        double contentRadius = CenterRadius + wedgeThickness * 0.52;
+        Point anchor = WedgeGeometry.PolarToCartesian(center, contentRadius, midAngle);
 
-        if (!string.IsNullOrEmpty(item.TargetPath))
+        // Icon centred on the anchor, shifted up by half its height + a small gap.
+        double iconY = anchor.Y - iconSize / 2 - 2;
+        double iconX = anchor.X - iconSize / 2;
+
+        // Clamp the icon rect inside the wheel.
+        ClampInsideWheel(center, ref iconX, ref iconY, iconSize, iconSize, WheelRadius - 6);
+
+        if (!string.IsNullOrEmpty(item.TargetPath) && iconSize > 0)
         {
             var icon = IconExtractor.GetCached(item.TargetPath, () =>
                 Application.Current?.Dispatcher.Invoke(InvalidateVisual));
             if (icon != null)
-            {
-                double iconSize = Math.Min(40, wedgeThickness * 0.30);
-                if (iconSize > 0)
-                {
-                    dc.DrawImage(icon, new Rect(
-                        iconPos.X - iconSize / 2,
-                        iconPos.Y - iconSize / 2 - 6,
-                        iconSize, iconSize));
-                }
-            }
+                dc.DrawImage(icon, new Rect(iconX, iconY, iconSize, iconSize));
         }
 
-        // Label: place under the icon, well inside the wheel rim.
-        double textRadius = CenterRadius + wedgeThickness * 0.55;
-        Point textPos = WedgeGeometry.PolarToCartesian(center, textRadius, midAngle);
-
-        // Truncate based on how much room the wedge actually has at this
-        // radius — wider wedges (fewer items) can fit more characters.
+        // Label sits directly below the icon.
         int slotCount = Math.Max(MinWedgeSlots, _items.Count);
-        double chordWidth = 2 * textRadius * Math.Sin(Math.PI / slotCount) - 16;
-        // Roughly 9 px per character at 16 px font for mixed CJK/Latin.
+        double chordWidth = 2 * contentRadius * Math.Sin(Math.PI / slotCount) - 16;
         int maxChars = Math.Max(4, (int)(chordWidth / 9));
         string label = TruncateText(item.Label, Math.Min(12, maxChars));
 
@@ -356,28 +361,42 @@ public class RadialMenu : FrameworkElement
 
         // Place the icon a bit higher so the label sits visibly below it,
         // centred horizontally on the wedge midline.
-        double drawX = textPos.X - formattedText.Width / 2;
-        double drawY = textPos.Y - formattedText.Height / 2 + wedgeThickness * 0.10;
+        // Label sits directly below the icon, horizontally centred on the anchor.
+        double drawX = anchor.X - formattedText.Width / 2;
+        double drawY = iconY + iconSize + 2;
 
-        // Final safety clamp: keep the entire text rectangle inside the
-        // wheel disc by pulling it back along the radial direction.
+        // Final safety clamp: keep the entire text rectangle inside the wheel disc.
         ClampInsideWheel(center, ref drawX, ref drawY,
             formattedText.Width, formattedText.Height, WheelRadius - 6);
 
+        // Draw a dark shadow first to ensure readability over any background image.
+        var shadowBrush = new SolidColorBrush(Color.FromArgb(0xCC, 0, 0, 0));
+        shadowBrush.Freeze();
+        var shadow = new FormattedText(label,
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                         FontStyles.Normal,
+                         isHovered ? FontWeights.Bold : FontWeights.SemiBold,
+                         FontStretches.Normal),
+            16, shadowBrush, 96);
+        dc.DrawText(shadow, new Point(drawX + 1, drawY + 1));
+
         dc.DrawText(formattedText, new Point(drawX, drawY));
 
-        // Sub-menu indicator on the rim
+        // Sub-menu indicator: small › drawn just to the right of the label,
+        // at the same radial position so it stays inside the wedge.
         if (item.IsFolder)
         {
-            double arrowRadius = Math.Max(CenterRadius + 2, animRadius - 16);
-            Point arrowPos = WedgeGeometry.PolarToCartesian(center, arrowRadius, midAngle);
-            var arrowBrush = new SolidColorBrush(TrimColor);
+            var arrowBrush = new SolidColorBrush(Color.FromArgb(0xCC, TrimColor.R, TrimColor.G, TrimColor.B));
             arrowBrush.Freeze();
             var arrowText = new FormattedText("›",
                 CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
-                new Typeface("Segoe UI"), 16, arrowBrush, 96);
-            dc.DrawText(arrowText, new Point(arrowPos.X - arrowText.Width / 2, arrowPos.Y - arrowText.Height / 2));
+                new Typeface("Segoe UI"), 14, arrowBrush, 96);
+            // Place it just to the right of the label text, vertically centred.
+            dc.DrawText(arrowText, new Point(
+                drawX + formattedText.Width + 2,
+                drawY + formattedText.Height / 2 - arrowText.Height / 2));
         }
     }
 
@@ -418,8 +437,10 @@ public class RadialMenu : FrameworkElement
             StartPoint = new Point(0.5, 0),
             EndPoint = new Point(0.5, 1)
         };
-        grad.GradientStops.Add(new GradientStop(Color.FromRgb(0x2A, 0x24, 0x1B), 0.0));
-        grad.GradientStops.Add(new GradientStop(Color.FromRgb(0x10, 0x0E, 0x0C), 1.0));
+        grad.GradientStops.Add(new GradientStop(Color.FromArgb(
+            HasBackgroundImage ? (byte)0xCC : (byte)0xFF, 0x2A, 0x24, 0x1B), 0.0));
+        grad.GradientStops.Add(new GradientStop(Color.FromArgb(
+            HasBackgroundImage ? (byte)0xCC : (byte)0xFF, 0x10, 0x0E, 0x0C), 1.0));
         grad.Freeze();
 
         var ringPen = new Pen(new SolidColorBrush(TrimColor), 2);
