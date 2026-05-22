@@ -1,36 +1,121 @@
-name: Build & Release
+name: Release
+
+# Triggered when commits land on `main` (typically via merge from `dev`).
+# Reads the version from ShortcutWheel.csproj. If a matching `vX.Y.Z` tag
+# does not yet exist, builds the app, extracts the matching section from
+# CHANGELOG.md, creates the tag and publishes a GitHub Release.
+#
+# To cut a release:
+#   1. On `dev`: bump <Version> in ShortcutWheel.csproj
+#   2. Add a `## [X.Y.Z] - YYYY-MM-DD` section to CHANGELOG.md
+#   3. Open a PR from `dev` to `main` and merge it
+#   4. CI does the rest
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      - name: Publish
+      - name: Read version from csproj
+        id: version
+        shell: pwsh
+        run: |
+          $xml = [xml](Get-Content ShortcutWheel.csproj)
+          $version = ($xml.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
+          if (-not $version) { throw "Version element not found in ShortcutWheel.csproj" }
+          $tag = "v$version"
+          Write-Host "csproj version: $version (tag: $tag)"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Check whether tag already exists
+        id: tag_check
+        shell: bash
+        run: |
+          if git rev-parse --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.tag }} already exists — skipping release"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        if: steps.tag_check.outputs.exists == 'false'
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "${{ steps.version.outputs.tag }}"
+
+          $body = ""
+          if (Test-Path CHANGELOG.md) {
+            $content = Get-Content CHANGELOG.md -Raw
+            $escaped = [regex]::Escape($version)
+            # Match the section header `## [VERSION]` (with optional date) and
+            # capture everything until the next `## [` heading or end-of-file.
+            $pattern = "(?ms)^##\s*\[$escaped\][^\r\n]*\r?\n(.*?)(?=^##\s*\[|\z)"
+            $m = [regex]::Match($content, $pattern)
+            if ($m.Success) {
+              $body = $m.Groups[1].Value.Trim()
+            }
+          }
+
+          if (-not $body) {
+            # Fallback: synthesise notes from commits since the previous tag.
+            $prevTag = git describe --tags --abbrev=0 2>$null
+            if ($LASTEXITCODE -eq 0 -and $prevTag) {
+              $log = git log "$prevTag..HEAD" --pretty=format:"- %s" --no-merges
+            } else {
+              $log = git log --pretty=format:"- %s" --no-merges
+            }
+            $body = "### Changes`n`n$log"
+          }
+
+          # Append a footer linking to the full changelog.
+          $body = "$body`n`n---`nFull changelog: see [CHANGELOG.md](CHANGELOG.md)"
+
+          $body | Out-File -FilePath release-notes.md -Encoding utf8
+          Write-Host "----- Release notes -----"
+          Write-Host $body
+          Write-Host "-------------------------"
+
+      - name: Publish (single-file, framework-dependent, win-x64)
+        if: steps.tag_check.outputs.exists == 'false'
         run: >
           dotnet publish ShortcutWheel.csproj
           -c Release
           -r win-x64
           --self-contained false
           -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
 
       - name: Create Release
+        if: steps.tag_check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          files: publish/ShortcutWheel.exe
-          generate_release_notes: true
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
+          target_commitish: main
+          files: |
+            publish/ShortcutWheel.exe

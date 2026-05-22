@@ -134,12 +134,118 @@
         </Style>
 
         <!-- ============================ ComboBox =========================== -->
+        <Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{StaticResource Bg.Input}" />
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Bg.Hover}" />
+                                <Setter Property="Foreground" Value="{StaticResource Trim.Gold}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Bg.Selected}" />
+                                <Setter Property="Foreground" Value="{StaticResource Text.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="DarkComboBoxToggleButton" TargetType="ToggleButton">
+            <Border x:Name="Bd"
+                    Background="{StaticResource Bg.Input}"
+                    BorderBrush="{StaticResource Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    SnapsToDevicePixels="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="22" />
+                    </Grid.ColumnDefinitions>
+                    <Path x:Name="Arrow"
+                          Grid.Column="1"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 0 0 L 4 4 L 8 0 Z"
+                          Fill="{StaticResource Trim.Gold}" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Trim.GoldDim}" />
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Trim.Gold}" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{StaticResource Bg.Input}" />
             <Setter Property="Foreground" Value="{StaticResource Text.Primary}" />
             <Setter Property="BorderBrush" Value="{StaticResource Border.Subtle}" />
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Template="{StaticResource DarkComboBoxToggleButton}"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border x:Name="DropDownBorder"
+                                        Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Trim.GoldDim}"
+                                        BorderThickness="1"
+                                        MinWidth="{TemplateBinding ActualWidth}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        SnapsToDevicePixels="True">
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- ============================ TabControl ========================= -->
@@ -390,16 +496,21 @@
                                                VerticalAlignment="Center" Margin="0,6"
                                                Foreground="{StaticResource Text.Secondary}" />
                                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-                                        <CheckBox x:Name="SetCtrl" Margin="0,0,14,0">Ctrl</CheckBox>
-                                        <CheckBox x:Name="SetAlt" Margin="0,0,14,0">Alt</CheckBox>
-                                        <CheckBox x:Name="SetShift" Margin="0,0,14,0">Shift</CheckBox>
-                                        <CheckBox x:Name="SetWin">Win</CheckBox>
+                                        <CheckBox x:Name="SetCtrl" Margin="0,0,14,0"
+                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Ctrl</CheckBox>
+                                        <CheckBox x:Name="SetAlt" Margin="0,0,14,0"
+                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Alt</CheckBox>
+                                        <CheckBox x:Name="SetShift" Margin="0,0,14,0"
+                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Shift</CheckBox>
+                                        <CheckBox x:Name="SetWin"
+                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Win</CheckBox>
                                     </StackPanel>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="按键 / Key"
                                                VerticalAlignment="Center" Margin="0,6"
                                                Foreground="{StaticResource Text.Secondary}" />
-                                    <ComboBox x:Name="SetKey" Grid.Row="1" Grid.Column="1" Margin="0,6" />
+                                    <ComboBox x:Name="SetKey" Grid.Row="1" Grid.Column="1" Margin="0,6"
+                                              SelectionChanged="SetKey_SelectionChanged" />
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="鼠标侧键 / Mouse"
                                                VerticalAlignment="Center" Margin="0,6"
@@ -412,7 +523,8 @@
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="鼠标按键 / Button"
                                                VerticalAlignment="Center" Margin="0,6"
                                                Foreground="{StaticResource Text.Secondary}" />
-                                    <ComboBox x:Name="SetMouseButton" Grid.Row="3" Grid.Column="1" Margin="0,6" />
+                                    <ComboBox x:Name="SetMouseButton" Grid.Row="3" Grid.Column="1" Margin="0,6"
+                                              SelectionChanged="SetMouseButton_SelectionChanged" />
 
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="按住延迟 / Hold delay"
                                                VerticalAlignment="Center" Margin="0,6"

@@ -87,7 +87,8 @@ public partial class ConfigWindow : Window
 
         // Key
         SetKey.ItemsSource = Enum.GetValues<System.Windows.Input.Key>();
-        SetKey.SelectedItem = System.Windows.Input.Key.Space;
+        SetKey.SelectedItem = (System.Windows.Input.Key)System.Windows.Input.KeyInterop
+            .KeyFromVirtualKey((int)settings.Hotkey.Key);
 
         // Mouse
         SetMouseEnabled.IsChecked = settings.Hotkey.MouseHotkeyEnabled;
@@ -403,6 +404,36 @@ public partial class ConfigWindow : Window
     }
 
     #region Settings Handlers
+
+    private void SetKey_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        if (SetKey.SelectedItem is not System.Windows.Input.Key key) return;
+        int vk = System.Windows.Input.KeyInterop.VirtualKeyFromKey(key);
+        _configService.Config.Settings.Hotkey.Key = (VirtualKey)vk;
+        _configService.SaveDebounced();
+    }
+
+    private void SetModifier_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        HotkeyModifiers mods = HotkeyModifiers.None;
+        if (SetCtrl.IsChecked == true) mods |= HotkeyModifiers.Control;
+        if (SetAlt.IsChecked == true) mods |= HotkeyModifiers.Alt;
+        if (SetShift.IsChecked == true) mods |= HotkeyModifiers.Shift;
+        if (SetWin.IsChecked == true) mods |= HotkeyModifiers.Windows;
+        _configService.Config.Settings.Hotkey.Modifiers = mods;
+        _configService.SaveDebounced();
+    }
+
+    private void SetMouseButton_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        int idx = SetMouseButton.SelectedIndex;
+        if (idx < 0 || idx >= MouseButtonValues.Length) return;
+        _configService.Config.Settings.Hotkey.MouseButton = MouseButtonValues[idx];
+        _configService.SaveDebounced();
+    }
 
     private void SetMouseEnabled_Changed(object sender, RoutedEventArgs e)
     {

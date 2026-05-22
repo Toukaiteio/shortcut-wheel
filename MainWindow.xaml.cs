@@ -61,12 +61,12 @@ public partial class MainWindow : Window
         _hotkeyWindow.AddHook(WndProc);
 
         _hotkeyService.SetWindowHandle(_hotkeyWindow.Handle);
-        HotkeyRegistered = _hotkeyService.RegisterKeyboardHotkey(_configService.Config.Settings.Hotkey);
+        RefreshHotkeyRegistration();
 
-        if (_configService.Config.Settings.Hotkey.MouseHotkeyEnabled)
-        {
-            _hotkeyService.RegisterMouseHotkey(_configService.Config.Settings.Hotkey.MouseButton);
-        }
+        // Auto-reapply hotkeys whenever the config is saved (e.g. user changes
+        // the modifiers, key, or mouse-button in ConfigWindow).
+        _configService.ConfigChanged += (_, _) =>
+            Dispatcher.Invoke(RefreshHotkeyRegistration);
 
         SetupSystemTray();
 
@@ -167,7 +167,27 @@ public partial class MainWindow : Window
     private void ReloadConfig()
     {
         _configService.Load();
-        _hotkeyService.RegisterKeyboardHotkey(_configService.Config.Settings.Hotkey);
+        RefreshHotkeyRegistration();
+    }
+
+    /// <summary>
+    /// Re-registers both the keyboard hotkey and the mouse-side-button hook
+    /// from the latest config. Safe to call repeatedly — RegisterKeyboardHotkey
+    /// and RegisterMouseHotkey both unregister any prior hook first.
+    /// </summary>
+    private void RefreshHotkeyRegistration()
+    {
+        var hotkey = _configService.Config.Settings.Hotkey;
+        HotkeyRegistered = _hotkeyService.RegisterKeyboardHotkey(hotkey);
+
+        if (hotkey.MouseHotkeyEnabled)
+        {
+            _hotkeyService.RegisterMouseHotkey(hotkey.MouseButton);
+        }
+        else
+        {
+            _hotkeyService.UnregisterMouseHotkey();
+        }
     }
 
     private void ExitApp()

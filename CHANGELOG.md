@@ -2,6 +2,18 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.2.1] - 2026-05-22
+
+### Fixed
+- Hotkey config (modifiers, key, mouse button) was never persisted because the modifier checkboxes and key/button ComboBoxes had no event handlers
+- `LoadSettings` ignored the saved hotkey key and always reset it to `Space`
+- Saving the hotkey config did not re-register the keyboard or mouse hook, so changes only applied on next app start
+- `ReloadConfig` only re-registered the keyboard hotkey, never the mouse side-button hook
+- ConfigWindow ComboBox text was unreadable on the dark theme — replaced default ComboBox template with a fully themed dark/gold one (selected item, dropdown items, hover & selection states all themed)
+
+### Changed
+- Mouse side button release no longer always dismisses the wheel. CSGO-style behaviour: releasing on a wedge launches it; releasing on the centre navigates back; releasing on empty space keeps the wheel open so the user can continue with the mouse
+
 ## [0.2.0] - 2026-05-22
 
 ### Fixed

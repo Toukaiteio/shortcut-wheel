@@ -56,7 +56,28 @@ public partial class OverlayWindow : Window
 
     private void OnWheelDismissed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() => HideWheel());
+        Dispatcher.Invoke(() =>
+        {
+            if (!_wheelActive) return;
+
+            // CSGO-style press-and-release select: if the cursor is over a
+            // wedge when the mouse side button is released, treat it as a
+            // click on that wedge. If the cursor is on the centre disc,
+            // navigate back. If the cursor is outside the wheel, keep the
+            // wheel OPEN so the user can continue interacting with the mouse
+            // — releasing the side button no longer dismisses the wheel.
+            var pos = Mouse.GetPosition(RadialMenuControl);
+            int idx = RadialMenuControl.HitTestWedge(pos);
+            if (idx >= 0)
+            {
+                OnWedgeClicked(this, idx);
+            }
+            else if (idx == -2)
+            {
+                NavigateBack();
+            }
+            // idx == -1: leave the wheel visible.
+        });
     }
 
     private void OnWheelVisibilityChanged(bool visible)
