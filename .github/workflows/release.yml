@@ -14,7 +14,7 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 permissions:
@@ -116,6 +116,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           body_path: release-notes.md
-          target_commitish: main
+          target_commitish: master
           files: |
             publish/ShortcutWheel.exe
