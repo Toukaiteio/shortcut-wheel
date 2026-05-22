@@ -2,6 +2,14 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.2.0] - 2026-05-22
+
+### Fixed
+- Sub-menu hover highlight not shown when mouse is stationary after entering a sub-menu
+- Single-item sub-menus occupied the full 360° disc; items now occupy at most 90° (minimum 4 wedge slots)
+- Wedge labels rendered outside the wheel disc on large-radius wheels
+- Right-click on empty wheel area closed the window instead of navigating back one level
+
 ## [0.1.0] - 2026-05-21
 
 ### Added

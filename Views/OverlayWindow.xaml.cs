@@ -46,7 +46,6 @@ public partial class OverlayWindow : Window
         _hotkeyService.WheelVisibilityChanged += OnWheelVisibilityChanged;
 
         RadialMenuControl.WedgeClicked += OnWedgeClicked;
-        RadialMenuControl.WedgeRightClicked += OnWedgeRightClicked;
         RadialMenuControl.CenterClicked += OnCenterClicked;
     }
 
@@ -232,11 +231,6 @@ public partial class OverlayWindow : Window
         RadialMenuControl.AnimateIn();
     }
 
-    private void OnWedgeRightClicked(object? sender, int index)
-    {
-        NavigateBack();
-    }
-
     private void OnCenterClicked(object? sender, EventArgs e)
     {
         NavigateBack();
@@ -260,6 +254,16 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseDown(object sender, MouseButtonEventArgs e)
     {
+        // Right click anywhere navigates back one level (or closes the
+        // wheel when already at the root). This matches the behaviour
+        // users expect from CSGO-style radial menus.
+        if (e.ChangedButton == System.Windows.Input.MouseButton.Right)
+        {
+            NavigateBack();
+            e.Handled = true;
+            return;
+        }
+
         var pos = e.GetPosition(RadialMenuControl);
         int hit = RadialMenuControl.HitTestWedge(pos);
         if (hit == -1)

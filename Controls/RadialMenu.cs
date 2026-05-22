@@ -18,6 +18,7 @@ namespace ShortcutWheel.Controls;
 public class RadialMenu : FrameworkElement
 {
     private const int PlaceholderSlots = 6;
+    private const int MinWedgeSlots = 4;
 
     #region Dependency Properties
 
@@ -113,7 +114,6 @@ public class RadialMenu : FrameworkElement
     private bool _isAnimating;
 
     public event EventHandler<int>? WedgeClicked;
-    public event EventHandler<int>? WedgeRightClicked;
     public event EventHandler? CenterClicked;
 
     #endregion
@@ -127,7 +127,11 @@ public class RadialMenu : FrameworkElement
     public void SetItems(IList<ShortcutItem> items)
     {
         _items = items.ToList();
-        _hoveredIndex = -1;
+        // Re-evaluate hover based on current mouse position so that
+        // entering a sub-menu while the cursor is already over a wedge
+        // shows the hover highlight immediately (without requiring movement).
+        var mousePos = Mouse.GetPosition(this);
+        _hoveredIndex = HitTestWedge(mousePos);
         InvalidateVisual();
     }
 
@@ -179,7 +183,7 @@ public class RadialMenu : FrameworkElement
 
         // 2) Wedges (real or placeholder)
         bool hasItems = _items.Count > 0;
-        int wedgeCount = hasItems ? _items.Count : PlaceholderSlots;
+        int wedgeCount = hasItems ? Math.Max(MinWedgeSlots, _items.Count) : PlaceholderSlots;
 
         DrawWedges(dc, center, animRadius, wedgeCount, hasItems);
 
@@ -241,10 +245,15 @@ public class RadialMenu : FrameworkElement
         double endAngle = startAngle + wedgeAngle;
 
         var wedge = WedgeGeometry.CreateWedge(center, CenterRadius, animRadius, startAngle, endAngle);
-        bool isHovered = i == _hoveredIndex;
+
+        // Slots beyond the real item count are empty padding wedges (no hover, no content).
+        bool isEmpty = hasItems && i >= _items.Count;
+        bool isHovered = !isEmpty && i == _hoveredIndex;
 
         Brush fill = BuildWedgeFill(center, animRadius, isHovered);
         dc.DrawGeometry(fill, separatorPen, wedge);
+
+        if (isEmpty) return;
 
         double midAngle = (startAngle + endAngle) / 2;
 
@@ -320,10 +329,17 @@ public class RadialMenu : FrameworkElement
             }
         }
 
-        // Label slightly outside the icon
-        double textRadius = CenterRadius + wedgeThickness * 0.78;
+        // Label: place under the icon, well inside the wheel rim.
+        double textRadius = CenterRadius + wedgeThickness * 0.55;
         Point textPos = WedgeGeometry.PolarToCartesian(center, textRadius, midAngle);
-        string label = TruncateText(item.Label, 10);
+
+        // Truncate based on how much room the wedge actually has at this
+        // radius — wider wedges (fewer items) can fit more characters.
+        int slotCount = Math.Max(MinWedgeSlots, _items.Count);
+        double chordWidth = 2 * textRadius * Math.Sin(Math.PI / slotCount) - 16;
+        // Roughly 9 px per character at 16 px font for mixed CJK/Latin.
+        int maxChars = Math.Max(4, (int)(chordWidth / 9));
+        string label = TruncateText(item.Label, Math.Min(12, maxChars));
 
         var labelBrush = new SolidColorBrush(isHovered ? TrimColor : TextColor);
         labelBrush.Freeze();
@@ -336,12 +352,18 @@ public class RadialMenu : FrameworkElement
                          isHovered ? FontWeights.Bold : FontWeights.SemiBold,
                          FontStretches.Normal),
             16, labelBrush, 96);
-        formattedText.TextAlignment = TextAlignment.Center;
-        formattedText.MaxTextWidth = Math.Max(40, wedgeThickness * 1.3);
 
-        dc.DrawText(formattedText, new Point(
-            textPos.X - formattedText.Width / 2,
-            textPos.Y - formattedText.Height / 2));
+        // Place the icon a bit higher so the label sits visibly below it,
+        // centred horizontally on the wedge midline.
+        double drawX = textPos.X - formattedText.Width / 2;
+        double drawY = textPos.Y - formattedText.Height / 2 + wedgeThickness * 0.10;
+
+        // Final safety clamp: keep the entire text rectangle inside the
+        // wheel disc by pulling it back along the radial direction.
+        ClampInsideWheel(center, ref drawX, ref drawY,
+            formattedText.Width, formattedText.Height, WheelRadius - 6);
+
+        dc.DrawText(formattedText, new Point(drawX, drawY));
 
         // Sub-menu indicator on the rim
         if (item.IsFolder)
@@ -471,6 +493,55 @@ public class RadialMenu : FrameworkElement
         dc.DrawText(title, new Point(center.X - title.Width / 2, y));
     }
 
+    /// <summary>
+    /// Pull the (drawX, drawY)-anchored rectangle back along the radial
+    /// direction until all four corners lie within <paramref name="maxRadius"/>.
+    /// This is the last line of defence against label text spilling outside
+    /// the wheel disc.
+    /// </summary>
+    private static void ClampInsideWheel(Point center, ref double drawX, ref double drawY,
+        double width, double height, double maxRadius)
+    {
+        // All four corners of the text rect must be inside the disc.
+        double FurthestDistance(double x, double y)
+        {
+            double[] xs = { x, x + width };
+            double[] ys = { y, y + height };
+            double max = 0;
+            foreach (var px in xs)
+            {
+                foreach (var py in ys)
+                {
+                    double d = Math.Sqrt((px - center.X) * (px - center.X) +
+                                         (py - center.Y) * (py - center.Y));
+                    if (d > max) max = d;
+                }
+            }
+            return max;
+        }
+
+        // Iteratively pull the rectangle toward the centre when any corner
+        // is too far out. Up to 8 passes is plenty given the small steps.
+        for (int pass = 0; pass < 8; pass++)
+        {
+            double dist = FurthestDistance(drawX, drawY);
+            if (dist <= maxRadius) return;
+
+            // Direction from worst-case corner toward centre — approximated
+            // by direction from rect centre toward wheel centre.
+            double cx = drawX + width / 2;
+            double cy = drawY + height / 2;
+            double dx = center.X - cx;
+            double dy = center.Y - cy;
+            double len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 0.5) return;
+
+            double pull = dist - maxRadius + 1;
+            drawX += dx / len * pull;
+            drawY += dy / len * pull;
+        }
+    }
+
     private static Color Lighten(Color c, double amount)
     {
         amount = Math.Clamp(amount, 0, 1);
@@ -503,8 +574,11 @@ public class RadialMenu : FrameworkElement
     public int HitTestWedge(Point mousePos)
     {
         Point center = new Point(WheelRadius, WheelRadius);
-        int count = _items.Count > 0 ? _items.Count : PlaceholderSlots;
-        var (index, _) = WedgeGeometry.HitTest(center, CenterRadius, WheelRadius, mousePos, count);
+        bool hasItems = _items.Count > 0;
+        int slotCount = hasItems ? Math.Max(MinWedgeSlots, _items.Count) : PlaceholderSlots;
+        var (index, _) = WedgeGeometry.HitTest(center, CenterRadius, WheelRadius, mousePos, slotCount);
+        // Slots beyond real items are empty padding — treat as a miss.
+        if (hasItems && index >= _items.Count) return -1;
         return index;
     }
 
@@ -538,18 +612,10 @@ public class RadialMenu : FrameworkElement
 
     protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
     {
-        var pos = e.GetPosition(this);
-        int idx = HitTestWedge(pos);
-
-        if (idx >= 0 && idx < _items.Count)
-        {
-            WedgeRightClicked?.Invoke(this, idx);
-        }
-        else if (idx == -2)
-        {
-            CenterClicked?.Invoke(this, EventArgs.Empty);
-        }
-
+        // Right-click navigation is handled at the window level
+        // (OverlayWindow.Window_MouseDown) so that misses outside the
+        // wheel still navigate back. We only mark the event as handled
+        // here to keep downstream handlers from interfering.
         e.Handled = true;
     }
 
