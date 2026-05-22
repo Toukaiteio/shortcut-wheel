@@ -49,6 +49,30 @@ public partial class OverlayWindow : Window
         RadialMenuControl.CenterClicked += OnCenterClicked;
     }
 
+    /// <summary>
+    /// Forces the WPF visual tree to complete its first layout pass so that
+    /// elements like the background image render correctly the very first
+    /// time ShowWheel is called. Without this, Visibility=Collapsed elements
+    /// (like BgImage) only get measured/arranged after the window is shown,
+    /// which means the first ShowWheel sees a blank background.
+    /// </summary>
+    public void PreWarm()
+    {
+        // Position off-screen and fully transparent so the user can't see it.
+        var origLeft = Left;
+        var origTop = Top;
+        var origOpacity = Opacity;
+        Left = -10000;
+        Top = -10000;
+        Opacity = 0;
+        Show();
+        UpdateLayout();
+        Hide();
+        Left = origLeft;
+        Top = origTop;
+        Opacity = origOpacity;
+    }
+
     private void OnHotkeyPressed(object? sender, EventArgs e)
     {
         ShowWheel();
@@ -108,6 +132,8 @@ public partial class OverlayWindow : Window
         RadialMenuControl.CenterRadius = settings.CenterCircleRadius;
 
         ApplyPalette(settings);
+        ApplyBackgroundImage(settings, wheelRadius);
+        Opacity = Math.Clamp(settings.Opacity, 0.1, 1.0);
 
         // Get cursor position using Win32
         NativeMethods.GetCursorPos(out NativeMethods.POINT cursorPos);
@@ -326,10 +352,70 @@ public partial class OverlayWindow : Window
         e.Handled = true;
     }
 
+    private bool _externalDragActive;
+
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        HideWheel();
+        // Don't close while the user is dragging a file onto the wheel.
+        if (!_externalDragActive)
+            HideWheel();
     }
+
+    private void ApplyBackgroundImage(Models.AppSettings settings, int wheelRadius)
+    {
+        var path = settings.BackgroundImagePath;
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+        {
+            BgEllipse.Visibility = Visibility.Collapsed;
+            RadialMenuControl.HasBackgroundImage = false;
+            CompositionTarget.Rendering -= SyncBgImageClip;
+            return;
+        }
+
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(path, UriKind.Absolute);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+
+            BgImageBrush.ImageSource = bmp;
+            BgEllipse.Width = wheelRadius * 2;
+            BgEllipse.Height = wheelRadius * 2;
+            BgEllipse.Opacity = Math.Clamp(settings.BackgroundImageOpacity, 0, 1);
+
+            // Start collapsed (scale 0); animation grows to 1.
+            BgEllipseScale.ScaleX = 0;
+            BgEllipseScale.ScaleY = 0;
+
+            BgEllipse.Visibility = Visibility.Visible;
+            RadialMenuControl.HasBackgroundImage = true;
+
+            CompositionTarget.Rendering -= SyncBgImageClip;
+            CompositionTarget.Rendering += SyncBgImageClip;
+        }
+        catch
+        {
+            BgEllipse.Visibility = Visibility.Collapsed;
+            RadialMenuControl.HasBackgroundImage = false;
+        }
+    }
+
+    private void SyncBgImageClip(object? sender, EventArgs e)
+    {
+        if (!_wheelActive)
+        {
+            CompositionTarget.Rendering -= SyncBgImageClip;
+            return;
+        }
+        double s = EaseOutCubic(RadialMenuControl.AnimationProgress);
+        BgEllipseScale.ScaleX = s;
+        BgEllipseScale.ScaleY = s;
+    }
+
+    private static double EaseOutCubic(double t) => 1.0 - Math.Pow(1.0 - t, 3);
 
     private void ApplyPalette(Models.AppSettings settings)
     {
@@ -370,6 +456,7 @@ public partial class OverlayWindow : Window
         if (e.Data.GetDataPresent(DataFormats.FileDrop) ||
             e.Data.GetDataPresent(DataFormats.Text))
         {
+            _externalDragActive = true;
             e.Effects = DragDropEffects.Copy;
         }
         else
@@ -396,12 +483,14 @@ public partial class OverlayWindow : Window
 
     private void LayoutRoot_DragLeave(object sender, DragEventArgs e)
     {
+        _externalDragActive = false;
         _dragHoverIndex = -1;
         RadialMenuControl.InvalidateVisual();
     }
 
     private void LayoutRoot_Drop(object sender, DragEventArgs e)
     {
+        _externalDragActive = false;
         _dragHoverIndex = -1;
 
         string[]? files = null;
@@ -426,19 +515,43 @@ public partial class OverlayWindow : Window
         int wedgeIndex = RadialMenuControl.HitTestWedge(pos);
         var visible = GetVisibleItems();
 
+        // Resolve async to avoid blocking the UI thread on WScript.Shell COM calls.
+        _ = ResolveAndAddDroppedFilesAsync(files, wedgeIndex, visible);
+        e.Handled = true;
+    }
+
+    private async System.Threading.Tasks.Task ResolveAndAddDroppedFilesAsync(
+        string[] files, int wedgeIndex, List<ShortcutItem> visible)
+    {
         foreach (string file in files)
         {
-            // Defer .lnk resolution to LaunchService so dropping doesn't
-            // block the UI thread on slow / hung COM calls.
-            ShortcutItem item = new ShortcutItem
+            ShortcutItem item;
+            if (ShortcutResolver.IsShortcut(file))
             {
-                Label = Path.GetFileNameWithoutExtension(file),
-                TargetPath = file
-            };
+                var info = await ShortcutResolver.ResolveAsync(file);
+                item = info != null
+                    ? new ShortcutItem
+                    {
+                        Label = Path.GetFileNameWithoutExtension(file),
+                        TargetPath = info.TargetPath,
+                        Arguments = info.Arguments,
+                        WorkingDirectory = info.WorkingDirectory
+                    }
+                    : new ShortcutItem
+                    {
+                        Label = Path.GetFileNameWithoutExtension(file),
+                        TargetPath = file
+                    };
+            }
+            else
+            {
+                item = new ShortcutItem
+                {
+                    Label = Path.GetFileNameWithoutExtension(file),
+                    TargetPath = file
+                };
+            }
 
-            // If the user dropped onto an existing folder wedge, add the
-            // shortcut as a child of that folder. Otherwise add it to the
-            // current level.
             if (wedgeIndex >= 0 && wedgeIndex < visible.Count &&
                 !ReferenceEquals(visible[wedgeIndex], NextPageMarker) &&
                 visible[wedgeIndex].IsFolder)
@@ -456,7 +569,6 @@ public partial class OverlayWindow : Window
         _configService.Save();
         RadialMenuControl.SetItems(GetVisibleItems());
         RadialMenuControl.InvalidateVisual();
-        e.Handled = true;
     }
 
     #endregion

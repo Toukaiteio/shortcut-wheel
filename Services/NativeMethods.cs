@@ -38,11 +38,57 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool DestroyIcon(IntPtr hIcon);
 
+    // SHGetImageList: retrieves the system image list at a given size.
+    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    public static extern int SHGetImageList(int iImageList, ref Guid riid, out IImageList ppv);
+
+    [DllImport("user32.dll")]
+    public static extern bool ImageList_Destroy(IntPtr himl);
+
+    // IImageList GUID
+    public static readonly Guid IID_IImageList = new Guid("46EB5926-582E-4017-9FDF-E8998DAA0950");
+
+    // Image list sizes
+    public const int SHIL_SMALL   = 0x1;  // 16×16
+    public const int SHIL_LARGE   = 0x0;  // 32×32
+    public const int SHIL_EXTRALARGE = 0x2; // 48×48
+    public const int SHIL_JUMBO   = 0x4;  // 256×256
+
     public const uint SHGFI_ICON = 0x000000100;
     public const uint SHGFI_LARGEICON = 0x000000000;
     public const uint SHGFI_SMALLICON = 0x000000001;
+    public const uint SHGFI_SYSICONINDEX = 0x000004000; // return icon index
     public const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
     public const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
+
+    [ComImport]
+    [Guid("46EB5926-582E-4017-9FDF-E8998DAA0950")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IImageList
+    {
+        [PreserveSig] int Add(IntPtr hbmImage, IntPtr hbmMask, out int pi);
+        [PreserveSig] int ReplaceIcon(int i, IntPtr hicon, out int pi);
+        [PreserveSig] int SetOverlayImage(int iImage, int iOverlay);
+        [PreserveSig] int Replace(int i, IntPtr hbmImage, IntPtr hbmMask);
+        [PreserveSig] int AddMasked(IntPtr hbmImage, int crMask, out int pi);
+        [PreserveSig] int Draw(ref IMAGELISTDRAWPARAMS pimldp);
+        [PreserveSig] int Remove(int i);
+        [PreserveSig] int GetIcon(int i, int flags, out IntPtr picon);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IMAGELISTDRAWPARAMS
+    {
+        public int cbSize;
+        public IntPtr himl;
+        public int i;
+        public IntPtr hdcDst;
+        public int x, y, cx, cy, xBitmap, yBitmap;
+        public int rgbBk, rgbFg;
+        public int fStyle, dwRop;
+        public int fState, Frame;
+        public int crEffect;
+    }
 
     public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -82,6 +128,24 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    // Fullscreen detection
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("shcore.dll")]
+    public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left, Top, Right, Bottom; }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT

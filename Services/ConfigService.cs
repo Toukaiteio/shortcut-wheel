@@ -94,6 +94,41 @@ public class ConfigService
         }, token);
     }
 
+    /// <summary>
+    /// Scans all items for .lnk TargetPaths and resolves them to the real
+    /// executable path in the background. Saves once if any items changed.
+    /// Safe to call fire-and-forget from the UI thread.
+    /// </summary>
+    public async Task MigrateLnkPathsAsync()
+    {
+        bool changed = await MigrateItemsAsync(Config.RootItems);
+        if (changed) Save();
+    }
+
+    private static async Task<bool> MigrateItemsAsync(IList<ShortcutItem> items)
+    {
+        bool changed = false;
+        foreach (var item in items)
+        {
+            if (ShortcutResolver.IsShortcut(item.TargetPath))
+            {
+                var info = await ShortcutResolver.ResolveAsync(item.TargetPath!);
+                if (info != null && !string.IsNullOrEmpty(info.TargetPath))
+                {
+                    item.TargetPath = info.TargetPath;
+                    if (item.Arguments == null && info.Arguments != null)
+                        item.Arguments = info.Arguments;
+                    if (item.WorkingDirectory == null && info.WorkingDirectory != null)
+                        item.WorkingDirectory = info.WorkingDirectory;
+                    changed = true;
+                }
+            }
+            if (item.Children?.Count > 0)
+                changed |= await MigrateItemsAsync(item.Children);
+        }
+        return changed;
+    }
+
     private ShortcutConfig CreateDefaultConfig()
     {
         var config = new ShortcutConfig();

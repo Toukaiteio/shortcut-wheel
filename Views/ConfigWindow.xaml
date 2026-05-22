@@ -16,11 +16,11 @@
 
     <Window.Resources>
         <!-- ============================ Brushes ============================ -->
-        <SolidColorBrush x:Key="Bg.Page" Color="#1A1612" />
-        <SolidColorBrush x:Key="Bg.Panel" Color="#241E18" />
-        <SolidColorBrush x:Key="Bg.Input" Color="#15110D" />
-        <SolidColorBrush x:Key="Bg.Hover" Color="#3A2F22" />
-        <SolidColorBrush x:Key="Bg.Selected" Color="#5C4528" />
+        <SolidColorBrush x:Key="Bg.Page" Color="#B01A1612" />
+        <SolidColorBrush x:Key="Bg.Panel" Color="#CC241E18" />
+        <SolidColorBrush x:Key="Bg.Input" Color="#CC15110D" />
+        <SolidColorBrush x:Key="Bg.Hover" Color="#CC3A2F22" />
+        <SolidColorBrush x:Key="Bg.Selected" Color="#CC5C4528" />
         <SolidColorBrush x:Key="Border.Subtle" Color="#3A332A" />
         <SolidColorBrush x:Key="Trim.Gold" Color="#C9A24E" />
         <SolidColorBrush x:Key="Trim.GoldDim" Color="#7A6A48" />
@@ -320,6 +320,12 @@
     </Window.Resources>
 
     <Border Background="{StaticResource Bg.Page}" Padding="0">
+        <!-- Background image layer (behind all content) -->
+        <Grid>
+            <Image x:Name="ConfigBgImage"
+                   Stretch="UniformToFill"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False" />
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -473,144 +479,256 @@
 
                 <TabItem Header="设置 / Settings">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                        <StackPanel MaxWidth="720" HorizontalAlignment="Left">
-                            <TextBlock Text="热键 / Hotkey" Style="{StaticResource SectionHeader}" />
+                        <!-- Two-column responsive layout via UniformGrid -->
+                        <UniformGrid Columns="2" HorizontalAlignment="Stretch">
+                            <!-- ══ LEFT COLUMN ══════════════════════════════ -->
+                            <StackPanel Margin="0,0,8,0">
 
-                            <Border Background="{StaticResource Bg.Panel}"
-                                    BorderBrush="{StaticResource Border.Subtle}"
-                                    BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="170" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
+                                <!-- Hotkey -->
+                                <TextBlock Text="热键 / Hotkey" Style="{StaticResource SectionHeader}" />
+                                <Border Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Border.Subtle}"
+                                        BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="修饰键 / Modifiers"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-                                        <CheckBox x:Name="SetCtrl" Margin="0,0,14,0"
-                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Ctrl</CheckBox>
-                                        <CheckBox x:Name="SetAlt" Margin="0,0,14,0"
-                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Alt</CheckBox>
-                                        <CheckBox x:Name="SetShift" Margin="0,0,14,0"
-                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Shift</CheckBox>
-                                        <CheckBox x:Name="SetWin"
-                                                  Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Win</CheckBox>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="修饰键 / Modifiers"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+                                            <CheckBox x:Name="SetCtrl" Margin="0,0,14,0"
+                                                      Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Ctrl</CheckBox>
+                                            <CheckBox x:Name="SetAlt" Margin="0,0,14,0"
+                                                      Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Alt</CheckBox>
+                                            <CheckBox x:Name="SetShift" Margin="0,0,14,0"
+                                                      Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Shift</CheckBox>
+                                            <CheckBox x:Name="SetWin"
+                                                      Checked="SetModifier_Changed" Unchecked="SetModifier_Changed">Win</CheckBox>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="按键 / Key"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <ComboBox x:Name="SetKey" Grid.Row="1" Grid.Column="1" Margin="0,6"
+                                                  SelectionChanged="SetKey_SelectionChanged" />
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="鼠标侧键 / Mouse"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <CheckBox x:Name="SetMouseEnabled" Grid.Row="2" Grid.Column="1" Margin="0,6"
+                                                  Checked="SetMouseEnabled_Changed" Unchecked="SetMouseEnabled_Changed">
+                                            启用鼠标侧键 / Enable mouse side button
+                                        </CheckBox>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="鼠标按键 / Button"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <ComboBox x:Name="SetMouseButton" Grid.Row="3" Grid.Column="1" Margin="0,6"
+                                                  SelectionChanged="SetMouseButton_SelectionChanged" />
+
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="按住延迟 / Hold delay"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+                                            <Slider x:Name="SetHoldDelay" Minimum="100" Maximum="1000"
+                                                    MinWidth="120" HorizontalAlignment="Stretch"
+                                                    TickFrequency="50" VerticalAlignment="Center"
+                                                    ValueChanged="SetHoldDelay_Changed" />
+                                            <TextBlock x:Name="SetHoldDelayLabel" Text="200ms" Margin="10,0,0,0"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Appearance -->
+                                <TextBlock Text="外观 / Appearance" Style="{StaticResource SectionHeader}" />
+                                <Border Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Border.Subtle}"
+                                        BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="转盘半径 / Wheel radius"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+                                            <Slider x:Name="SetWheelRadius" Minimum="160" Maximum="380"
+                                                    MinWidth="120" HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Center"
+                                                    ValueChanged="SetWheelRadius_Changed" />
+                                            <TextBlock x:Name="SetWheelRadiusLabel" Text="280" Margin="10,0,0,0"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="不透明度 / Opacity"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+                                            <Slider x:Name="SetOpacity" Minimum="0.3" Maximum="1.0"
+                                                    MinWidth="120" HorizontalAlignment="Stretch"
+                                                    TickFrequency="0.05" VerticalAlignment="Center"
+                                                    ValueChanged="SetOpacity_Changed" />
+                                            <TextBlock x:Name="SetOpacityLabel" Text="0.95" Margin="10,0,0,0"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="主色 / Accent color"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <TextBox x:Name="SetAccentColor" Grid.Row="2" Grid.Column="1" Margin="0,6"
+                                                 TextChanged="SetAccentColor_Changed" />
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="背景色 / Background"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <TextBox x:Name="SetBgColor" Grid.Row="3" Grid.Column="1" Margin="0,6"
+                                                 TextChanged="SetBgColor_Changed" />
+
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="背景图 / Bg image"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <Grid Grid.Row="4" Grid.Column="1" Margin="0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="SetBgImagePath" Grid.Column="0" Margin="0,0,6,0"
+                                                     TextChanged="SetBgImagePath_Changed" />
+                                            <Button Grid.Column="1" Content="浏览..." Padding="8,6" Margin="0,0,6,0"
+                                                    Click="BtnBrowseBgImage_Click" />
+                                            <Button Grid.Column="2" Content="✕" Padding="8,6"
+                                                    Click="BtnClearBgImage_Click" />
+                                        </Grid>
+
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="背景图透明度 / Opacity"
+                                                   VerticalAlignment="Center" Margin="0,6"
+                                                   Foreground="{StaticResource Text.Secondary}" />
+                                        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+                                            <Slider x:Name="SetBgImageOpacity" Minimum="0" Maximum="1"
+                                                    MinWidth="120" HorizontalAlignment="Stretch"
+                                                    TickFrequency="0.05" VerticalAlignment="Center"
+                                                    ValueChanged="SetBgImageOpacity_Changed" />
+                                            <TextBlock x:Name="SetBgImageOpacityLabel" Text="0.40" Margin="10,0,0,0"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                            </StackPanel>
+
+                            <!-- ══ RIGHT COLUMN ═════════════════════════════ -->
+                            <StackPanel Margin="8,0,0,0">
+
+                                <!-- General -->
+                                <TextBlock Text="通用 / General" Style="{StaticResource SectionHeader}" />
+                                <Border Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Border.Subtle}"
+                                        BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <CheckBox x:Name="SetStartWithWindows" Margin="0,0,0,10"
+                                                  Checked="SetStartWithWindows_Changed" Unchecked="SetStartWithWindows_Changed">
+                                            随 Windows 启动 / Start with Windows
+                                        </CheckBox>
+                                        <CheckBox x:Name="SetRunMinimized">
+                                            最小化到托盘 / Start minimized to tray
+                                        </CheckBox>
                                     </StackPanel>
+                                </Border>
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="按键 / Key"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <ComboBox x:Name="SetKey" Grid.Row="1" Grid.Column="1" Margin="0,6"
-                                              SelectionChanged="SetKey_SelectionChanged" />
+                                <!-- Update -->
+                                <TextBlock Text="更新 / Update" Style="{StaticResource SectionHeader}" />
+                                <Border Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Border.Subtle}"
+                                        BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <!-- Version info -->
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="当前版本 / Current version"
+                                                           Foreground="{StaticResource Text.Secondary}" FontSize="11" />
+                                                <TextBlock x:Name="SetCurrentVersion"
+                                                           Foreground="{StaticResource Trim.Gold}"
+                                                           FontWeight="SemiBold" FontSize="14" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <Button x:Name="BtnCheckUpdate" Grid.Column="1"
+                                                    Content="检查更新 / Check"
+                                                    VerticalAlignment="Center"
+                                                    Click="BtnCheckUpdate_Click" />
+                                        </Grid>
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="鼠标侧键 / Mouse"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <CheckBox x:Name="SetMouseEnabled" Grid.Row="2" Grid.Column="1" Margin="0,6"
-                                              Checked="SetMouseEnabled_Changed" Unchecked="SetMouseEnabled_Changed">
-                                        启用鼠标侧键 / Enable mouse side button
-                                    </CheckBox>
+                                        <Separator Margin="0,0,0,12" />
 
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="鼠标按键 / Button"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <ComboBox x:Name="SetMouseButton" Grid.Row="3" Grid.Column="1" Margin="0,6"
-                                              SelectionChanged="SetMouseButton_SelectionChanged" />
+                                        <CheckBox x:Name="SetAutoUpdate" Margin="0,0,0,8"
+                                                  Checked="SetAutoUpdate_Changed" Unchecked="SetAutoUpdate_Changed">
+                                            自动检查更新 / Auto-check for updates
+                                        </CheckBox>
 
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="按住延迟 / Hold delay"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-                                        <Slider x:Name="SetHoldDelay" Minimum="100" Maximum="1000" Width="220"
-                                                TickFrequency="50" VerticalAlignment="Center"
-                                                ValueChanged="SetHoldDelay_Changed" />
-                                        <TextBlock x:Name="SetHoldDelayLabel" Text="200ms" Margin="12,0,0,0"
-                                                   VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                        <CheckBox x:Name="SetSilentUpdate" Margin="0,0,0,8"
+                                                  Checked="SetSilentUpdate_Changed" Unchecked="SetSilentUpdate_Changed">
+                                            静默更新（自动下载并安装）/ Silent update
+                                        </CheckBox>
+
+                                        <TextBlock x:Name="SetUpdateStatus"
+                                                   Foreground="{StaticResource Text.Secondary}"
+                                                   FontSize="11" TextWrapping="Wrap"
+                                                   Margin="0,4,0,0" />
                                     </StackPanel>
-                                </Grid>
-                            </Border>
+                                </Border>
 
-                            <TextBlock Text="外观 / Appearance" Style="{StaticResource SectionHeader}" />
-
-                            <Border Background="{StaticResource Bg.Panel}"
-                                    BorderBrush="{StaticResource Border.Subtle}"
-                                    BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="170" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="转盘半径 / Wheel radius"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-                                        <Slider x:Name="SetWheelRadius" Minimum="160" Maximum="380" Width="220"
-                                                VerticalAlignment="Center"
-                                                ValueChanged="SetWheelRadius_Changed" />
-                                        <TextBlock x:Name="SetWheelRadiusLabel" Text="280" Margin="12,0,0,0"
-                                                   VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
+                                <!-- About -->
+                                <TextBlock Text="关于 / About" Style="{StaticResource SectionHeader}" />
+                                <Border Background="{StaticResource Bg.Panel}"
+                                        BorderBrush="{StaticResource Border.Subtle}"
+                                        BorderThickness="1" CornerRadius="6" Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="ShortcutWheel"
+                                                   Foreground="{StaticResource Trim.Gold}"
+                                                   FontWeight="Bold" FontSize="15" Margin="0,0,0,4" />
+                                        <TextBlock Text="CSGO-style radial shortcut launcher for Windows"
+                                                   Foreground="{StaticResource Text.Secondary}"
+                                                   FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <TextBlock Foreground="{StaticResource Text.Secondary}" FontSize="11">
+                                            <Run Text="GitHub: " /><Hyperlink NavigateUri="https://github.com/Toukaiteio/shortcut-wheel"
+                                                     RequestNavigate="Hyperlink_RequestNavigate"
+                                                     Foreground="{StaticResource Trim.GoldDim}">
+                                                Toukaiteio/shortcut-wheel
+                                            </Hyperlink>
+                                        </TextBlock>
                                     </StackPanel>
+                                </Border>
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="不透明度 / Opacity"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-                                        <Slider x:Name="SetOpacity" Minimum="0.3" Maximum="1.0" Width="220"
-                                                TickFrequency="0.05" VerticalAlignment="Center"
-                                                ValueChanged="SetOpacity_Changed" />
-                                        <TextBlock x:Name="SetOpacityLabel" Text="0.95" Margin="12,0,0,0"
-                                                   VerticalAlignment="Center" Foreground="{StaticResource Trim.Gold}" />
-                                    </StackPanel>
-
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="主色 / Accent color"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <TextBox x:Name="SetAccentColor" Grid.Row="2" Grid.Column="1" Margin="0,6"
-                                             TextChanged="SetAccentColor_Changed" />
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="背景色 / Background"
-                                               VerticalAlignment="Center" Margin="0,6"
-                                               Foreground="{StaticResource Text.Secondary}" />
-                                    <TextBox x:Name="SetBgColor" Grid.Row="3" Grid.Column="1" Margin="0,6"
-                                             TextChanged="SetBgColor_Changed" />
-                                </Grid>
-                            </Border>
-
-                            <TextBlock Text="通用 / General" Style="{StaticResource SectionHeader}" />
-
-                            <Border Background="{StaticResource Bg.Panel}"
-                                    BorderBrush="{StaticResource Border.Subtle}"
-                                    BorderThickness="1" CornerRadius="6" Padding="16">
-                                <StackPanel>
-                                    <CheckBox x:Name="SetStartWithWindows" Margin="0,0,0,8"
-                                              Checked="SetStartWithWindows_Changed" Unchecked="SetStartWithWindows_Changed">
-                                        随 Windows 启动 / Start with Windows
-                                    </CheckBox>
-                                    <CheckBox x:Name="SetRunMinimized">
-                                        最小化到托盘 / Start minimized to tray
-                                    </CheckBox>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                            </StackPanel>
+                        </UniformGrid>
                     </ScrollViewer>
                 </TabItem>
             </TabControl>
+        </Grid>
         </Grid>
     </Border>
 </Window>

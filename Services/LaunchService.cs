@@ -17,22 +17,11 @@ public class LaunchService
             string? args = item.Arguments;
             string? workDir = item.WorkingDirectory;
 
-            // Resolve .lnk so we don't shell-execute through an extra layer.
-            if (ShortcutResolver.IsShortcut(target))
-            {
-                var info = ShortcutResolver.Resolve(target);
-                if (info != null)
-                {
-                    target = info.TargetPath;
-                    args ??= info.Arguments;
-                    workDir ??= info.WorkingDirectory;
-                }
-            }
-
-            // Only set WorkingDirectory for real file-system paths.
-            // URIs (https://, steam://, ms-settings:, etc.) have no
-            // meaningful directory and Path.GetDirectoryName throws on them.
-            if (workDir == null && IsFilePath(target))
+            // .lnk files: let the shell handle them directly via UseShellExecute.
+            // Calling ShortcutResolver.Resolve here would block the UI thread
+            // on slow/network targets and cause the app to freeze.
+            // Non-.lnk paths: set WorkingDirectory for file-system targets.
+            if (!ShortcutResolver.IsShortcut(target) && workDir == null && IsFilePath(target))
                 workDir = Path.GetDirectoryName(target);
 
             var psi = new ProcessStartInfo

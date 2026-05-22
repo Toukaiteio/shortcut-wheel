@@ -45,12 +45,15 @@ public partial class MainWindow : Window
     {
         _configService = new ConfigService();
         _configService.Load();
+        // Migrate any .lnk TargetPaths to real exe paths in the background.
+        _ = _configService.MigrateLnkPathsAsync();
 
         _hotkeyService = new HotkeyService();
         _launchService = new LaunchService();
         _screenService = new ScreenService();
         _updateService = new UpdateService();
         _overlayWindow = new OverlayWindow(_hotkeyService, _configService, _launchService, _screenService);
+        _overlayWindow.PreWarm();
 
         // Message-only HWND for hotkey reception. Lives independently of any
         // visible window, so closing the overlay never tears it down.
@@ -85,7 +88,8 @@ public partial class MainWindow : Window
             try
             {
                 await System.Threading.Tasks.Task.Delay(8000);
-                await CheckForUpdatesAsync(showWhenUpToDate: false);
+                if (_configService.Config.Settings.AutoUpdateEnabled)
+                    await CheckForUpdatesAsync(showWhenUpToDate: false);
             }
             catch (Exception ex) { App.LogError($"Auto update check failed: {ex.Message}"); }
         }), DispatcherPriority.ApplicationIdle);
@@ -212,35 +216,86 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Checks GitHub Releases for a newer version. When found, opens the
-    /// UpdateWindow so the user can review the changelog and choose to
-    /// install. When <paramref name="showWhenUpToDate"/> is true (manual
-    /// trigger from tray menu), shows a notification on the up-to-date case.
+    /// Checks GitHub Releases for a newer version.
+    /// - If <paramref name="showWhenUpToDate"/> is true (manual trigger), always shows result.
+    /// - If silent update is enabled and this is an auto-check, downloads and
+    ///   installs without showing a window.
+    /// - If a fullscreen app is running during auto-check, defers the popup
+    ///   (retries every 5 minutes) until the screen is no longer occupied.
     /// </summary>
     public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool showWhenUpToDate = false)
     {
         var info = await _updateService.CheckForUpdatesAsync();
+        bool silent = _configService.Config.Settings.SilentUpdate;
 
         Dispatcher.Invoke(() =>
         {
-            if (info != null)
+            if (info == null)
             {
-                var dlg = new Views.UpdateWindow(_updateService, info)
-                {
-                    Owner = null
-                };
-                dlg.Show();
-                dlg.Activate();
+                if (showWhenUpToDate)
+                    MessageBox.Show(
+                        $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
+                        "ShortcutWheel", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
-            else if (showWhenUpToDate)
+
+            // Silent update: download and apply without any UI.
+            if (silent && !showWhenUpToDate)
             {
-                MessageBox.Show(
-                    $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
-                    "ShortcutWheel",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                _ = SilentInstallAsync(info);
+                return;
             }
+
+            // Auto-check with fullscreen app running: defer until screen is free.
+            if (!showWhenUpToDate && Services.UpdateService.IsFullscreenAppRunning())
+            {
+                _ = DeferUpdatePopupAsync(info);
+                return;
+            }
+
+            ShowUpdateWindow(info);
         });
+    }
+
+    private void ShowUpdateWindow(Services.UpdateInfo info)
+    {
+        var dlg = new Views.UpdateWindow(_updateService, info) { Owner = null };
+        dlg.Show();
+        dlg.Activate();
+    }
+
+    private async System.Threading.Tasks.Task SilentInstallAsync(Services.UpdateInfo info)
+    {
+        try
+        {
+            App.LogInfo($"Silent update: downloading {info.TagName}...");
+            string temp = await _updateService.DownloadUpdateAsync(info);
+            App.LogInfo("Silent update: applying...");
+            _updateService.ApplyUpdateAndRestart(temp);
+        }
+        catch (Exception ex)
+        {
+            App.LogError($"Silent update failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Polls every 5 minutes until no fullscreen app is detected, then shows
+    /// the update window. Gives up after 2 hours.
+    /// </summary>
+    private async System.Threading.Tasks.Task DeferUpdatePopupAsync(Services.UpdateInfo info)
+    {
+        const int intervalMs = 5 * 60 * 1000;
+        const int maxRetries = 24; // 2 hours
+        for (int i = 0; i < maxRetries; i++)
+        {
+            await System.Threading.Tasks.Task.Delay(intervalMs);
+            if (!Services.UpdateService.IsFullscreenAppRunning())
+            {
+                Dispatcher.Invoke(() => ShowUpdateWindow(info));
+                return;
+            }
+        }
     }
 
     /// <summary>
