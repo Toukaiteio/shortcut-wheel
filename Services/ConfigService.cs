@@ -119,8 +119,40 @@ public class ConfigService
         Config.Settings.Hotkey ??= new HotkeyConfig();
         Config.RootItems ??= new List<ShortcutItem>();
         EnsureIds(Config.RootItems);
+        DeduplicateById(Config.RootItems);
 
         MigrateSchema();
+    }
+
+    /// <summary>
+    /// Removes duplicate entries (matched by Id) anywhere in the tree,
+    /// keeping only the first occurrence. Repairs configs corrupted by
+    /// an earlier drag-and-drop bug that left the same item referenced
+    /// in two parents.
+    /// </summary>
+    private static void DeduplicateById(IList<ShortcutItem> roots)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        Walk(roots);
+
+        void Walk(IList<ShortcutItem> list)
+        {
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                var id = list[i].Id;
+                if (string.IsNullOrEmpty(id)) continue;
+                if (!seen.Add(id))
+                {
+                    list.RemoveAt(i);
+                }
+            }
+            // Walk surviving children.
+            foreach (var item in list)
+            {
+                if (item.Children != null)
+                    Walk(item.Children);
+            }
+        }
     }
 
     /// <summary>

@@ -428,26 +428,13 @@ public partial class OverlayWindow : Window
 
         foreach (string file in files)
         {
-            ShortcutItem item;
-            if (ShortcutResolver.IsShortcut(file) &&
-                ShortcutResolver.Resolve(file) is { } info)
+            // Defer .lnk resolution to LaunchService so dropping doesn't
+            // block the UI thread on slow / hung COM calls.
+            ShortcutItem item = new ShortcutItem
             {
-                item = new ShortcutItem
-                {
-                    Label = Path.GetFileNameWithoutExtension(file),
-                    TargetPath = info.TargetPath,
-                    Arguments = info.Arguments,
-                    WorkingDirectory = info.WorkingDirectory
-                };
-            }
-            else
-            {
-                item = new ShortcutItem
-                {
-                    Label = Path.GetFileNameWithoutExtension(file),
-                    TargetPath = file
-                };
-            }
+                Label = Path.GetFileNameWithoutExtension(file),
+                TargetPath = file
+            };
 
             // If the user dropped onto an existing folder wedge, add the
             // shortcut as a child of that folder. Otherwise add it to the

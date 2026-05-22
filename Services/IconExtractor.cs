@@ -1,32 +1,94 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 
 namespace ShortcutWheel.Services;
 
+/// <summary>
+/// Thread-safe icon cache. All SHGetFileInfo / HICON work runs on a
+/// dedicated STA thread so it never blocks the WPF render thread and
+/// never dead-locks via Dispatcher.Invoke.
+/// </summary>
 public static class IconExtractor
 {
-    private static readonly ConcurrentDictionary<string, BitmapSource?> IconCache = new();
+    private static readonly ConcurrentDictionary<string, BitmapSource?> _cache = new();
+    private static readonly ConcurrentDictionary<string, bool> _pending = new();
 
-    public static BitmapSource? ExtractIcon(string filePath, int? iconIndex = null, int size = 32)
+    // Single long-lived STA worker thread for all shell icon work.
+    private static readonly BlockingCollection<Action> _queue = new();
+
+    static IconExtractor()
     {
-        string cacheKey = $"{filePath}:{iconIndex ?? -1}:{size}";
-
-        return IconCache.GetOrAdd(cacheKey, _ => TryGetIcon(filePath, size) ?? GetDefaultIcon());
+        var thread = new Thread(() =>
+        {
+            foreach (var work in _queue.GetConsumingEnumerable())
+            {
+                try { work(); }
+                catch { /* never crash the worker */ }
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "IconExtractor-STA"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
     }
 
-    private static BitmapSource? TryGetIcon(string filePath, int size)
+    /// <summary>
+    /// Returns a cached icon immediately (null if not yet loaded).
+    /// Schedules a background load on first call; calls <paramref name="onLoaded"/>
+    /// on the UI thread when the icon is ready. Safe to call from OnRender.
+    /// </summary>
+    public static BitmapSource? GetCached(string filePath, Action? onLoaded = null)
+    {
+        if (string.IsNullOrEmpty(filePath)) return null;
+
+        if (_cache.TryGetValue(filePath, out var cached))
+            return cached;
+
+        if (_pending.TryAdd(filePath, true))
+        {
+            _queue.Add(() =>
+            {
+                var icon = LoadOnStaThread(filePath);
+                _cache[filePath] = icon;
+                _pending.TryRemove(filePath, out _);
+                if (onLoaded != null)
+                    Application.Current?.Dispatcher.BeginInvoke(onLoaded);
+            });
+        }
+
+        return null;
+    }
+
+    /// <summary>Pre-warms the cache for a list of paths (fire-and-forget).</summary>
+    public static void Prefetch(IEnumerable<string?> paths)
+    {
+        foreach (var p in paths)
+        {
+            if (!string.IsNullOrEmpty(p))
+                GetCached(p);
+        }
+    }
+
+    // ── STA worker ──────────────────────────────────────────────────────────
+
+    private static BitmapSource? LoadOnStaThread(string filePath)
+    {
+        var bmp = TryGetIcon(filePath);
+        return bmp ?? GetDefaultIcon();
+    }
+
+    private static BitmapSource? TryGetIcon(string filePath)
     {
         try
         {
-            if (string.IsNullOrEmpty(filePath))
-                return null;
-
             var shfi = new NativeMethods.SHFILEINFO();
-            uint flags = NativeMethods.SHGFI_ICON |
-                         (size > 32 ? NativeMethods.SHGFI_LARGEICON : NativeMethods.SHGFI_SMALLICON) |
+            uint flags = NativeMethods.SHGFI_ICON | NativeMethods.SHGFI_SMALLICON |
                          NativeMethods.SHGFI_USEFILEATTRIBUTES;
 
             IntPtr result = NativeMethods.SHGetFileInfo(
@@ -41,10 +103,11 @@ public static class IconExtractor
 
             try
             {
-                var icon = Imaging.CreateBitmapSourceFromHIcon(
+                // We ARE on the STA thread — safe to call directly.
+                var bmp = Imaging.CreateBitmapSourceFromHIcon(
                     shfi.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                icon.Freeze();
-                return icon;
+                bmp.Freeze(); // must Freeze before crossing thread boundary
+                return bmp;
             }
             finally
             {
@@ -59,8 +122,6 @@ public static class IconExtractor
 
     private static BitmapSource? GetDefaultIcon()
     {
-        // Fall back to a generic file icon. We pretend a non-existing path
-        // is a normal file (USEFILEATTRIBUTES) so the shell never touches disk.
         try
         {
             var shfi = new NativeMethods.SHFILEINFO();
@@ -68,7 +129,7 @@ public static class IconExtractor
                          NativeMethods.SHGFI_USEFILEATTRIBUTES;
 
             IntPtr result = NativeMethods.SHGetFileInfo(
-                "file.txt",
+                "file.exe",
                 NativeMethods.FILE_ATTRIBUTE_NORMAL,
                 ref shfi,
                 (uint)Marshal.SizeOf(shfi),
@@ -78,10 +139,10 @@ public static class IconExtractor
             {
                 try
                 {
-                    var icon = Imaging.CreateBitmapSourceFromHIcon(
+                    var bmp = Imaging.CreateBitmapSourceFromHIcon(
                         shfi.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                    icon.Freeze();
-                    return icon;
+                    bmp.Freeze();
+                    return bmp;
                 }
                 finally
                 {
@@ -89,14 +150,9 @@ public static class IconExtractor
                 }
             }
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
 
-        // Absolute last resort: a transparent placeholder.
-        var blank = BitmapSource.Create(
-            32, 32, 96, 96,
+        var blank = BitmapSource.Create(32, 32, 96, 96,
             System.Windows.Media.PixelFormats.Bgra32,
             null, new byte[32 * 32 * 4], 32 * 4);
         blank.Freeze();

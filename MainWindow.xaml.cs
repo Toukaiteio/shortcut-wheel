@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using ShortcutWheel.Services;
 using ShortcutWheel.Views;
 
@@ -17,6 +18,7 @@ public partial class MainWindow : Window
     private ConfigService _configService = null!;
     private LaunchService _launchService = null!;
     private ScreenService _screenService = null!;
+    private UpdateService _updateService = null!;
     private OverlayWindow _overlayWindow = null!;
     private HwndSource? _hotkeyWindow;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
         _hotkeyService = new HotkeyService();
         _launchService = new LaunchService();
         _screenService = new ScreenService();
+        _updateService = new UpdateService();
         _overlayWindow = new OverlayWindow(_hotkeyService, _configService, _launchService, _screenService);
 
         // Message-only HWND for hotkey reception. Lives independently of any
@@ -74,6 +77,18 @@ public partial class MainWindow : Window
             ? "Running — press Ctrl+Alt+Space to open the wheel"
             : "WARNING: Hotkey registration failed (key may be in use)";
         App.LogInfo(status);
+
+        // Background update check: wait until the app is fully idle, then
+        // wait an extra 8 s before hitting GitHub. Failures are silent.
+        Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(8000);
+                await CheckForUpdatesAsync(showWhenUpToDate: false);
+            }
+            catch (Exception ex) { App.LogError($"Auto update check failed: {ex.Message}"); }
+        }), DispatcherPriority.ApplicationIdle);
     }
 
     /// <summary>
@@ -118,6 +133,7 @@ public partial class MainWindow : Window
         menu.Items.Add("显示帮助 / Show Help", null, (_, _) => ShowHelp());
         menu.Items.Add("配置 / Configure", null, (_, _) => OpenConfig());
         menu.Items.Add("重新加载配置 / Reload", null, (_, _) => ReloadConfig());
+        menu.Items.Add("检查更新 / Check for updates", null, async (_, _) => await CheckForUpdatesAsync(showWhenUpToDate: true));
         menu.Items.Add("-");
         menu.Items.Add("退出 / Exit", null, (_, _) => ExitApp());
 
@@ -193,6 +209,38 @@ public partial class MainWindow : Window
     private void ExitApp()
     {
         Application.Current.Shutdown();
+    }
+
+    /// <summary>
+    /// Checks GitHub Releases for a newer version. When found, opens the
+    /// UpdateWindow so the user can review the changelog and choose to
+    /// install. When <paramref name="showWhenUpToDate"/> is true (manual
+    /// trigger from tray menu), shows a notification on the up-to-date case.
+    /// </summary>
+    public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool showWhenUpToDate = false)
+    {
+        var info = await _updateService.CheckForUpdatesAsync();
+
+        Dispatcher.Invoke(() =>
+        {
+            if (info != null)
+            {
+                var dlg = new Views.UpdateWindow(_updateService, info)
+                {
+                    Owner = null
+                };
+                dlg.Show();
+                dlg.Activate();
+            }
+            else if (showWhenUpToDate)
+            {
+                MessageBox.Show(
+                    $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
+                    "ShortcutWheel",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        });
     }
 
     /// <summary>

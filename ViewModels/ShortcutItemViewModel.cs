@@ -25,7 +25,7 @@ public class ShortcutItemViewModel : INotifyPropertyChanged
     public ObservableCollection<ShortcutItemViewModel> Children { get; }
 
     public BitmapSource? Icon =>
-        !string.IsNullOrEmpty(_item.TargetPath) ? IconExtractor.ExtractIcon(_item.TargetPath) : null;
+        !string.IsNullOrEmpty(_item.TargetPath) ? IconExtractor.GetCached(_item.TargetPath) : null;
 
     public ShortcutItemViewModel(ShortcutItem item)
     {

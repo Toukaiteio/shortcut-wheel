@@ -2,6 +2,46 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.2.3] - 2026-05-22
+
+### Fixed
+- Drag-and-drop a shortcut into a folder then drag it back out caused it to
+  disappear. Root cause: WPF TreeView's ItemContainerGenerator cannot
+  re-parent the same VM instance across hierarchy levels when bound via
+  ItemsSource. PerformMove now always creates a fresh VM around the same
+  underlying model for the destination, so the TreeView sees a clean
+  insert/remove pair with no stale container references.
+- Selecting a folder in the config tree made it impossible to deselect it,
+  so "+ Add Folder / + Add File" always added inside the selected folder.
+  Clicking on empty space in the tree now clears the selection and resets
+  the property panel.
+- Drag-drop duplicate-item bug: IsDescendant and self-drop guard now compare
+  by model reference instead of VM reference, which is correct after the
+  fresh-VM-per-move change above.
+
+## [0.2.2] - 2026-05-22
+
+### Added
+- Auto-update from GitHub Releases. Checks 8 s after startup; also available
+  manually from the tray menu (Check for updates / 检查更新). The update dialog
+  shows current vs. latest version, the full release notes, download progress,
+  and a one-click install that swaps the exe via a temp helper script and
+  relaunches.
+
+### Fixed
+- `.lnk` import froze the UI thread because `ShortcutResolver.Resolve` was
+  called synchronously from drag/drop and the file dialog. `LaunchService`
+  already resolves at launch time, so imports now store the .lnk path directly.
+- `IconExtractor` ran shell COM calls on a managed Task pool thread; could
+  dead-lock with the WPF render thread via Dispatcher.Invoke. All shell icon
+  work now happens on a dedicated long-lived STA worker thread.
+- Deleting a shortcut collapsed every expanded folder (full TreeView rebuild).
+  Now removes only the affected node so other folders stay expanded.
+- Drag-drop into a folder created a duplicate ViewModel that shared the same
+  model, causing "two items appear after rename, deleting one removes both".
+  `PerformMove` no longer goes through `AddChild`; ConfigService also
+  deduplicates by Id when loading to repair previously-corrupted configs.
+
 ## [0.2.1] - 2026-05-22
 
 ### Fixed
