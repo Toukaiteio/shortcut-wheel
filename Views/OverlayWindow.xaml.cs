@@ -14,6 +14,9 @@ public partial class OverlayWindow : Window
     private readonly ConfigService _configService;
     private readonly LaunchService _launchService;
     private readonly ScreenService _screenService;
+    private string? _cachedBackgroundImagePath;
+    private DateTime _cachedBackgroundImageWriteTimeUtc;
+    private System.Windows.Media.Imaging.BitmapImage? _cachedBackgroundImage;
 
     private readonly Stack<List<ShortcutItem>> _navigationStack = new();
     private List<ShortcutItem> _currentItems = new();
@@ -374,14 +377,24 @@ public partial class OverlayWindow : Window
 
         try
         {
-            var bmp = new System.Windows.Media.Imaging.BitmapImage();
-            bmp.BeginInit();
-            bmp.UriSource = new Uri(path, UriKind.Absolute);
-            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            bmp.EndInit();
-            bmp.Freeze();
+            var writeTimeUtc = File.GetLastWriteTimeUtc(path);
+            if (_cachedBackgroundImage == null ||
+                !string.Equals(_cachedBackgroundImagePath, path, StringComparison.OrdinalIgnoreCase) ||
+                _cachedBackgroundImageWriteTimeUtc != writeTimeUtc)
+            {
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
 
-            BgImageBrush.ImageSource = bmp;
+                _cachedBackgroundImage = bmp;
+                _cachedBackgroundImagePath = path;
+                _cachedBackgroundImageWriteTimeUtc = writeTimeUtc;
+            }
+
+            BgImageBrush.ImageSource = _cachedBackgroundImage;
             BgEllipse.Width = wheelRadius * 2;
             BgEllipse.Height = wheelRadius * 2;
             BgEllipse.Opacity = Math.Clamp(settings.BackgroundImageOpacity, 0, 1);

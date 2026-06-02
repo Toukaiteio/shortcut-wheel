@@ -12,6 +12,7 @@ public class HotkeyService : IDisposable
     private IntPtr _hookId = IntPtr.Zero;
     private NativeMethods.LowLevelMouseProc? _mouseProc;
     private CancellationTokenSource? _holdCts;
+    private readonly object _holdLock = new();
     private HotkeyConfig? _config;
 
     public event EventHandler? HotkeyPressed;
@@ -79,36 +80,72 @@ public class HotkeyService : IDisposable
         if (nCode >= 0 && _config != null)
         {
             int msg = wParam.ToInt32();
-            int mouseButtonMsg = GetMouseButtonDownMsg(_config.MouseButton);
 
-            if (msg == mouseButtonMsg)
+            if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: true))
             {
-                _holdCts?.Cancel();
-                _holdCts = new CancellationTokenSource();
-                var token = _holdCts.Token;
-
-                Task.Delay(_config.HoldDelayMs, token).ContinueWith(t =>
+                CancellationTokenSource cts;
+                lock (_holdLock)
                 {
-                    if (!t.IsCanceled && !token.IsCancellationRequested)
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            WheelVisibilityChanged?.Invoke(true);
-                        });
-                    }
-                }, token);
+                    _holdCts?.Cancel();
+                    cts = new CancellationTokenSource();
+                    _holdCts = cts;
+                }
+
+                _ = NotifyAfterHoldAsync(_config.HoldDelayMs, cts);
             }
-            else if (msg == GetMouseButtonUpMsg(_config.MouseButton))
+            else if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: false))
             {
-                _holdCts?.Cancel();
-                Application.Current.Dispatcher.Invoke(() =>
+                lock (_holdLock)
                 {
-                    WheelDismissed?.Invoke(this, EventArgs.Empty);
-                });
+                    _holdCts?.Cancel();
+                }
+
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    WheelDismissed?.Invoke(this, EventArgs.Empty)));
             }
         }
 
         return NativeMethods.CallNextHookEx(_hookId, nCode, wParam, lParam);
+    }
+
+    private async Task NotifyAfterHoldAsync(int delayMs, CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(delayMs, cts.Token);
+            if (!cts.Token.IsCancellationRequested)
+            {
+                _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                    WheelVisibilityChanged?.Invoke(true)));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            lock (_holdLock)
+            {
+                if (ReferenceEquals(_holdCts, cts))
+                    _holdCts = null;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private static bool IsConfiguredMouseButtonEvent(MouseButton button, int msg, IntPtr lParam, bool isDown)
+    {
+        int expectedMsg = isDown ? GetMouseButtonDownMsg(button) : GetMouseButtonUpMsg(button);
+        if (msg != expectedMsg) return false;
+
+        if (button is not (MouseButton.XButton1 or MouseButton.XButton2))
+            return true;
+
+        var hook = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+        int xButton = (int)((hook.mouseData >> 16) & 0xffff);
+        return button == MouseButton.XButton1
+            ? xButton == NativeMethods.XBUTTON1
+            : xButton == NativeMethods.XBUTTON2;
     }
 
     private static int GetMouseButtonDownMsg(MouseButton button) => button switch
@@ -136,7 +173,9 @@ public class HotkeyService : IDisposable
     {
         UnregisterKeyboardHotkey();
         UnregisterMouseHotkey();
-        _holdCts?.Cancel();
-        _holdCts?.Dispose();
+        lock (_holdLock)
+        {
+            _holdCts?.Cancel();
+        }
     }
 }

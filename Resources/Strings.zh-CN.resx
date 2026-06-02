@@ -1,0 +1,231 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <data name="AppTitle">
+    <value>快捷转盘 - 配置</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · 配置</value>
+  </data>
+  <data name="AppHeader">
+    <value>快捷转盘 配置中心</value>
+  </data>
+  <data name="TabShortcuts">
+    <value>快捷方式</value>
+  </data>
+  <data name="TabSettings">
+    <value>设置</value>
+  </data>
+  <data name="BtnAddFile">
+    <value>+ 添加文件</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ 添加文件夹</value>
+  </data>
+  <data name="BtnDelete">
+    <value>删除</value>
+  </data>
+  <data name="StatusReady">
+    <value>就绪</value>
+  </data>
+  <data name="PropHeader">
+    <value>属性</value>
+  </data>
+  <data name="PropLabel">
+    <value>名称</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>目标路径</value>
+  </data>
+  <data name="PropArguments">
+    <value>参数</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>工作目录</value>
+  </data>
+  <data name="PropBrowse">
+    <value>浏览...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>是文件夹</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>包含子项</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>保存配置</value>
+  </data>
+  <data name="SectionHotkey">
+    <value>热键</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>修饰键</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>按键</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>鼠标侧键</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>启用鼠标侧键</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>鼠标按键</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>按住延迟</value>
+  </data>
+  <data name="SectionAppearance">
+    <value>外观</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>转盘半径</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>不透明度</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>主色</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>背景色</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>背景图</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>背景图透明度</value>
+  </data>
+  <data name="SectionGeneral">
+    <value>通用</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>随 Windows 启动</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>最小化到托盘</value>
+  </data>
+  <data name="SectionUpdate">
+    <value>更新</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>当前版本</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>检查更新</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>自动检查更新</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>静默更新（自动下载并安装）</value>
+  </data>
+  <data name="SectionAbout">
+    <value>关于</value>
+  </data>
+  <data name="AboutDescription">
+    <value>CSGO 风格的 Windows 径向快捷启动器</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub: </value>
+  </data>
+  <data name="SectionLanguage">
+    <value>语言</value>
+  </data>
+  <data name="DeleteConfirmTitle">
+    <value>确认删除</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>删除 '{0}'？</value>
+  </data>
+  <data name="AddedStatus">
+    <value>已添加：{0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>已添加 {0} 个项目</value>
+  </data>
+  <data name="MovedStatus">
+    <value>已移动：{0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>已删除：{0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>正在检查...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>已是最新版本 (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>发现新版本：{0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>检查失败：{0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>选择应用程序或快捷方式</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>选择目标</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>选择背景图</value>
+  </data>
+  <data name="TrayExit">
+    <value>退出</value>
+  </data>
+  <data name="TrayReload">
+    <value>重新加载配置</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>配置</value>
+  </data>
+  <data name="StartupBody">
+    <value>按 Ctrl+Alt+Space 呼出转盘
+或按住鼠标侧键 (默认 X1)
+右键托盘图标可设置 / 退出</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>快捷转盘 — 按 Ctrl+Alt+Space 打开 (右键查看更多)</value>
+  </data>
+  <data name="StartupTitle">
+    <value>快捷转盘 已启动</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>检查更新</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>热键注册失败，请右键托盘图标 → 配置</value>
+  </data>
+  <data name="TrayHelp">
+    <value>显示帮助</value>
+  </data>
+</root>

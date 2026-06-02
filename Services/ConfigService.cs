@@ -10,6 +10,8 @@ public class ConfigService
     private readonly string _configDir;
     private readonly string _configFilePath;
     private CancellationTokenSource? _debounceCts;
+    private readonly object _debounceLock = new();
+    private readonly object _saveLock = new();
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -68,30 +70,58 @@ public class ConfigService
 
     public void Save()
     {
-        string tmpPath = _configFilePath + ".tmp";
-        string json = JsonSerializer.Serialize(Config, JsonOptions);
-        File.WriteAllText(tmpPath, json);
+        lock (_saveLock)
+        {
+            Directory.CreateDirectory(_configDir);
 
-        if (File.Exists(_configFilePath))
-            File.Replace(tmpPath, _configFilePath, null);
-        else
-            File.Move(tmpPath, _configFilePath);
+            string tmpPath = _configFilePath + ".tmp";
+            string json = JsonSerializer.Serialize(Config, JsonOptions);
+            File.WriteAllText(tmpPath, json);
+
+            if (File.Exists(_configFilePath))
+                File.Replace(tmpPath, _configFilePath, null);
+            else
+                File.Move(tmpPath, _configFilePath);
+        }
     }
 
     public void SaveDebounced()
     {
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
-
-        Task.Delay(500, token).ContinueWith(_ =>
+        CancellationTokenSource cts;
+        lock (_debounceLock)
         {
-            if (!token.IsCancellationRequested)
+            _debounceCts?.Cancel();
+            cts = new CancellationTokenSource();
+            _debounceCts = cts;
+        }
+
+        _ = SaveDebouncedAsync(cts);
+    }
+
+    private async Task SaveDebouncedAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(500, cts.Token);
+            Save();
+            ConfigChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ShortcutWheel.App.LogError($"Debounced config save failed: {ex}");
+        }
+        finally
+        {
+            lock (_debounceLock)
             {
-                Save();
-                ConfigChanged?.Invoke(this, EventArgs.Empty);
+                if (ReferenceEquals(_debounceCts, cts))
+                    _debounceCts = null;
             }
-        }, token);
+            cts.Dispose();
+        }
     }
 
     /// <summary>

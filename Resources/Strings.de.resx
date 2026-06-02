@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <data name="AppTitle">
+    <value>ShortcutWheel - Konfiguration</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · Konfiguration</value>
+  </data>
+  <data name="AppHeader">
+    <value>ShortcutWheel Konfiguration</value>
+  </data>
+  <data name="TabShortcuts">
+    <value>Verknüpfungen</value>
+  </data>
+  <data name="TabSettings">
+    <value>Einstellungen</value>
+  </data>
+  <data name="BtnAddFile">
+    <value>+ Datei hinzufügen</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ Ordner hinzufügen</value>
+  </data>
+  <data name="BtnDelete">
+    <value>Löschen</value>
+  </data>
+  <data name="StatusReady">
+    <value>Bereit</value>
+  </data>
+  <data name="PropHeader">
+    <value>Eigenschaften</value>
+  </data>
+  <data name="PropLabel">
+    <value>Name</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>Zielpfad</value>
+  </data>
+  <data name="PropArguments">
+    <value>Argumente</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>Arbeitsverzeichnis</value>
+  </data>
+  <data name="PropBrowse">
+    <value>Durchsuchen...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>Ist Ordner</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>Hat Unterelemente</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>Konfiguration speichern</value>
+  </data>
+  <data name="SectionHotkey">
+    <value>Hotkey</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>Modifikatoren</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>Taste</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>Maus-Seitentaste</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>Maus-Seitentaste aktivieren</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>Schaltfläche</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>Haltezeit</value>
+  </data>
+  <data name="SectionAppearance">
+    <value>Erscheinungsbild</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>Radradius</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>Deckkraft</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>Akzentfarbe</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>Hintergrundfarbe</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>Hintergrundbild</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>Bilddeckkraft</value>
+  </data>
+  <data name="SectionGeneral">
+    <value>Allgemein</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>Mit Windows starten</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>Minimiert im Tray starten</value>
+  </data>
+  <data name="SectionUpdate">
+    <value>Aktualisierung</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>Aktuelle Version</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>Nach Updates suchen</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>Automatisch nach Updates suchen</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>Stilles Update</value>
+  </data>
+  <data name="SectionAbout">
+    <value>Über</value>
+  </data>
+  <data name="AboutDescription">
+    <value>CSGO-Stil radialer Launcher für Windows</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub: </value>
+  </data>
+  <data name="SectionLanguage">
+    <value>Sprache</value>
+  </data>
+  <data name="DeleteConfirmTitle">
+    <value>Löschen bestätigen</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>'{0}' löschen?</value>
+  </data>
+  <data name="AddedStatus">
+    <value>Hinzugefügt: {0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>{0} Element(e) hinzugefügt</value>
+  </data>
+  <data name="MovedStatus">
+    <value>Verschoben: {0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>Gelöscht: {0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>Wird geprüft...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>Aktuell (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>Neue Version: {0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>Fehler: {0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>Anwendung oder Verknüpfung auswählen</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>Ziel auswählen</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>Hintergrundbild auswählen</value>
+  </data>
+  <data name="TrayExit">
+    <value>Beenden</value>
+  </data>
+  <data name="TrayReload">
+    <value>Konfiguration neu laden</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>Konfigurieren</value>
+  </data>
+  <data name="StartupBody">
+    <value>Drücken Sie Ctrl+Alt+Space, um das Rad zu öffnen</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>ShortcutWheel — Ctrl+Alt+Space zum Öffnen</value>
+  </data>
+  <data name="StartupTitle">
+    <value>ShortcutWheel gestartet</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>Nach Updates suchen</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>Hotkey-Registrierung fehlgeschlagen</value>
+  </data>
+  <data name="TrayHelp">
+    <value>Hilfe</value>
+  </data>
+</root>

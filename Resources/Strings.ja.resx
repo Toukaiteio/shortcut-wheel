@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <data name="AppTitle">
+    <value>ショートカットホイール - 設定</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · 設定</value>
+  </data>
+  <data name="AppHeader">
+    <value>ショートカットホイール 設定センター</value>
+  </data>
+  <data name="TabShortcuts">
+    <value>ショートカット</value>
+  </data>
+  <data name="TabSettings">
+    <value>設定</value>
+  </data>
+  <data name="BtnAddFile">
+    <value>+ ファイル追加</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ フォルダ追加</value>
+  </data>
+  <data name="BtnDelete">
+    <value>削除</value>
+  </data>
+  <data name="StatusReady">
+    <value>準備完了</value>
+  </data>
+  <data name="PropHeader">
+    <value>プロパティ</value>
+  </data>
+  <data name="PropLabel">
+    <value>名前</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>ターゲットパス</value>
+  </data>
+  <data name="PropArguments">
+    <value>引数</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>作業ディレクトリ</value>
+  </data>
+  <data name="PropBrowse">
+    <value>参照...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>フォルダ</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>サブアイテムあり</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>設定を保存</value>
+  </data>
+  <data name="SectionHotkey">
+    <value>ホットキー</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>修飾キー</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>キー</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>マウスサイドボタン</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>マウスサイドボタンを有効にする</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>ボタン</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>長押し遅延</value>
+  </data>
+  <data name="SectionAppearance">
+    <value>外観</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>ホイール半径</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>不透明度</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>アクセントカラー</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>背景色</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>背景画像</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>画像の不透明度</value>
+  </data>
+  <data name="SectionGeneral">
+    <value>一般</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>Windows起動時に開始</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>トレイに最小化して起動</value>
+  </data>
+  <data name="SectionUpdate">
+    <value>アップデート</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>現在のバージョン</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>アップデートを確認</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>自動でアップデートを確認</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>サイレントアップデート</value>
+  </data>
+  <data name="SectionAbout">
+    <value>このアプリについて</value>
+  </data>
+  <data name="AboutDescription">
+    <value>Windows向けCSGOスタイルのラジアルランチャー</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub: </value>
+  </data>
+  <data name="SectionLanguage">
+    <value>言語</value>
+  </data>
+  <data name="DeleteConfirmTitle">
+    <value>削除の確認</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>'{0}' を削除しますか？</value>
+  </data>
+  <data name="AddedStatus">
+    <value>追加しました: {0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>{0} 件追加しました</value>
+  </data>
+  <data name="MovedStatus">
+    <value>移動しました: {0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>削除しました: {0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>確認中...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>最新バージョンです (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>新バージョン: {0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>確認失敗: {0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>アプリまたはショートカットを選択</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>ターゲットを選択</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>背景画像を選択</value>
+  </data>
+  <data name="TrayExit">
+    <value>終了</value>
+  </data>
+  <data name="TrayReload">
+    <value>設定を再読み込み</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>設定</value>
+  </data>
+  <data name="StartupBody">
+    <value>Ctrl+Alt+Space でホイールを開く</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>ShortcutWheel — Ctrl+Alt+Space で開く</value>
+  </data>
+  <data name="StartupTitle">
+    <value>ShortcutWheel 起動</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>アップデートを確認</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>ホットキーの登録に失敗しました</value>
+  </data>
+  <data name="TrayHelp">
+    <value>ヘルプ</value>
+  </data>
+</root>

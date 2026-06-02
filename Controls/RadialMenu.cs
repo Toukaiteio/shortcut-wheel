@@ -142,6 +142,7 @@ public class RadialMenu : FrameworkElement
     {
         _animationProgress = 0.0;
         _isAnimating = true;
+        CompositionTarget.Rendering -= OnRendering;
         CompositionTarget.Rendering += OnRendering;
     }
 
@@ -335,8 +336,7 @@ public class RadialMenu : FrameworkElement
 
         if (!string.IsNullOrEmpty(item.TargetPath) && iconSize > 0)
         {
-            var icon = IconExtractor.GetCached(item.TargetPath, () =>
-                Application.Current?.Dispatcher.Invoke(InvalidateVisual));
+            var icon = IconExtractor.GetCached(item.TargetPath, InvalidateVisual);
             if (icon != null)
                 dc.DrawImage(icon, new Rect(iconX, iconY, iconSize, iconSize));
         }

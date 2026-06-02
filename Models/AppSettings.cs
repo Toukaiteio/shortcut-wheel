@@ -27,4 +27,5 @@ public class AppSettings
 
     public string? BackgroundImagePath { get; set; }
     public double BackgroundImageOpacity { get; set; } = 0.4;
+    public string? Language { get; set; } // null = follow system
 }

@@ -29,6 +29,17 @@ public class UpdateService
     private const string AssetName = "ShortcutWheel.exe";
 
     private static readonly HttpClient Http = CreateHttp();
+    private static UpdateInfo? _pendingUpdate;
+
+    public static event EventHandler<UpdateInfo?>? PendingUpdateChanged;
+
+    public static UpdateInfo? PendingUpdate => _pendingUpdate;
+
+    public static void SetPendingUpdate(UpdateInfo? info)
+    {
+        _pendingUpdate = info;
+        PendingUpdateChanged?.Invoke(null, info);
+    }
 
     private static HttpClient CreateHttp()
     {
