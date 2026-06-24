@@ -208,18 +208,25 @@ public partial class OverlayWindow : Window
         }
         else if (!string.IsNullOrEmpty(item.TargetPath))
         {
-            // Hide FIRST so the wheel never visually lingers while the
-            // shell launches the process (UseShellExecute=true can stall
-            // on PATH-only targets like "code"). The actual Launch is
-            // dispatched at Background priority so the hide is painted
-            // immediately.
-            HideWheel();
+            // Hide FIRST so the wheel never visually lingers, then launch
+            // asynchronously on a background thread. UseShellExecute=true
+            // can block for a noticeable moment while resolving PATH entries
+            // or delegating to the shell, so we keep it off the UI thread.
             var captured = item;
-            Dispatcher.BeginInvoke(new Action(() =>
+            var closeAfterLaunch = _configService.Config.Settings.CloseWheelAfterLaunch;
+
+            // Hide wheel first (default behavior) or keep it open based on setting
+            if (closeAfterLaunch)
             {
-                try { _launchService.Launch(captured); }
-                catch (Exception ex) { App.LogError($"Launch failed: {ex}"); }
-            }), System.Windows.Threading.DispatcherPriority.Background);
+                HideWheel();
+            }
+
+            _ = _launchService.LaunchAsync(captured)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        App.LogError($"Launch failed: {t.Exception?.GetBaseException()}");
+                }, System.Threading.Tasks.TaskScheduler.Default);
         }
     }
 

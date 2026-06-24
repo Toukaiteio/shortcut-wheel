@@ -12,6 +12,7 @@ public class ShortcutItem
     public string? WorkingDirectory { get; set; }
     public string? IconPath { get; set; }
     public int? IconIndex { get; set; }
+    public bool RunAsAdmin { get; set; } = false;
 
     [JsonConverter(typeof(ObservableCollectionConverter<ShortcutItem>))]
     public ObservableCollection<ShortcutItem> Children { get; set; } = new();

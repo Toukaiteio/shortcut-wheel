@@ -480,8 +480,12 @@
                                     <CheckBox x:Name="PropIsFolder" IsEnabled="False" Margin="0,0,0,6">
                                         <TextBlock Text="{DynamicResource PropIsFolder}" Foreground="{StaticResource Text.Secondary}" />
                                     </CheckBox>
-                                    <CheckBox x:Name="PropHasChildren" IsEnabled="False">
+                                    <CheckBox x:Name="PropHasChildren" IsEnabled="False" Margin="0,0,0,6">
                                         <TextBlock Text="{DynamicResource PropHasChildren}" Foreground="{StaticResource Text.Secondary}" />
+                                    </CheckBox>
+                                    <CheckBox x:Name="PropRunAsAdmin" Margin="0,0,0,6"
+                                              Checked="PropRunAsAdmin_Changed" Unchecked="PropRunAsAdmin_Changed">
+                                        <TextBlock Text="{DynamicResource PropRunAsAdmin}" Foreground="{StaticResource Text.Secondary}" />
                                     </CheckBox>
 
                                     <Separator />
@@ -665,7 +669,9 @@
                                     <StackPanel>
                                         <CheckBox x:Name="SetStartWithWindows" Margin="0,0,0,10"
                                                   Checked="SetStartWithWindows_Changed" Unchecked="SetStartWithWindows_Changed"><Run Text="{DynamicResource GeneralStartWithWindows}" /></CheckBox>
-                                        <CheckBox x:Name="SetRunMinimized"><Run Text="{DynamicResource GeneralRunMinimized}" /></CheckBox>
+                                        <CheckBox x:Name="SetRunMinimized" Margin="0,0,0,10"><Run Text="{DynamicResource GeneralRunMinimized}" /></CheckBox>
+                                        <CheckBox x:Name="SetCloseWheelAfterLaunch"
+                                                  Checked="SetCloseWheelAfterLaunch_Changed" Unchecked="SetCloseWheelAfterLaunch_Changed"><Run Text="{DynamicResource GeneralCloseWheelAfterLaunch}" /></CheckBox>
                                     </StackPanel>
                                 </Border>
 

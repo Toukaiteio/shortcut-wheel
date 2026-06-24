@@ -24,6 +24,7 @@ public class AppSettings
     public bool RunMinimized { get; set; } = true;
     public bool AutoUpdateEnabled { get; set; } = true;
     public bool SilentUpdate { get; set; } = false;
+    public bool CloseWheelAfterLaunch { get; set; } = false;
 
     public string? BackgroundImagePath { get; set; }
     public double BackgroundImageOpacity { get; set; } = 0.4;

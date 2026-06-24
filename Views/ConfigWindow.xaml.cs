@@ -124,6 +124,7 @@ public partial class ConfigWindow : Window
         // General
         SetStartWithWindows.IsChecked = settings.StartWithWindows;
         SetRunMinimized.IsChecked = settings.RunMinimized;
+        SetCloseWheelAfterLaunch.IsChecked = settings.CloseWheelAfterLaunch;
 
         // Update section
         SetCurrentVersion.Text = "v" + Services.UpdateService.GetCurrentVersion();
@@ -160,6 +161,7 @@ public partial class ConfigWindow : Window
                 PropWorkDir.Text = _selectedItem.Item.WorkingDirectory ?? "";
                 PropIsFolder.IsChecked = _selectedItem.IsFolder;
                 PropHasChildren.IsChecked = _selectedItem.Children.Count > 0;
+                PropRunAsAdmin.IsChecked = _selectedItem.Item.RunAsAdmin;
                 PropBrowse.IsEnabled = true;
             }
             else
@@ -170,6 +172,7 @@ public partial class ConfigWindow : Window
                 PropWorkDir.Text = "";
                 PropIsFolder.IsChecked = false;
                 PropHasChildren.IsChecked = false;
+                PropRunAsAdmin.IsChecked = false;
                 PropBrowse.IsEnabled = false;
             }
         }
@@ -405,9 +408,10 @@ public partial class ConfigWindow : Window
 
     /// <summary>
     /// Adds item(s) from file paths, resolving .lnk files asynchronously
-    /// so the UI thread is never blocked.
+    /// so the UI thread is never blocked. Always adds to root level unless
+    /// dropped directly onto a folder node.
     /// </summary>
-    private async void AddItemsFromPaths(IEnumerable<string> paths)
+    private async void AddItemsFromPaths(IEnumerable<string> paths, ShortcutItemViewModel? targetFolder = null)
     {
         foreach (var path in paths)
         {
@@ -437,7 +441,18 @@ public partial class ConfigWindow : Window
                     TargetPath = path
                 };
             }
-            AddItemUnderSelection(item);
+
+            // Only add to folder if explicitly dropped onto it, otherwise add to root
+            if (targetFolder != null && targetFolder.IsFolder)
+            {
+                targetFolder.AddChild(item);
+            }
+            else
+            {
+                _configService.Config.RootItems.Add(item);
+                var newVm = new ShortcutItemViewModel(item);
+                _viewModels.Add(newVm);
+            }
         }
         _configService.Save();
         UpdateStatus($"已添加 / Added {paths.Count()} item(s)");
@@ -674,6 +689,22 @@ public partial class ConfigWindow : Window
     {
         if (!_isLoaded) return;
         _configService.Config.Settings.SilentUpdate = SetSilentUpdate.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
+    private void SetCloseWheelAfterLaunch_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        _configService.Config.Settings.CloseWheelAfterLaunch = SetCloseWheelAfterLaunch.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
+    private void PropRunAsAdmin_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isPopulatingProps) return;
+        if (_selectedItem == null) return;
+
+        _selectedItem.Item.RunAsAdmin = PropRunAsAdmin.IsChecked == true;
         _configService.SaveDebounced();
     }
 
@@ -925,7 +956,12 @@ public partial class ConfigWindow : Window
 
             if (files != null)
             {
-                AddItemsFromPaths(files.Where(p => !string.IsNullOrEmpty(p))!);
+                // Check if dropped directly onto a folder node
+                var (_, dropTargetVm, dropPosition) = ComputeDropTarget(e);
+                var targetFolder = (dropTargetVm != null && dropTargetVm.IsFolder && dropPosition == DropIndicatorAdorner.DropPosition.Into)
+                    ? dropTargetVm
+                    : null;
+                AddItemsFromPaths(files.Where(p => !string.IsNullOrEmpty(p))!, targetFolder);
             }
             e.Handled = true;
             return;

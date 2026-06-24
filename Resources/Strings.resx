@@ -140,6 +140,12 @@
   <data name="GeneralRunMinimized">
     <value>Start minimized to tray</value>
   </data>
+  <data name="GeneralCloseWheelAfterLaunch">
+    <value>Close wheel after launching a shortcut</value>
+  </data>
+  <data name="PropRunAsAdmin">
+    <value>Run as administrator</value>
+  </data>
   <!-- Settings: Update -->
   <data name="SectionUpdate">
     <value>Update</value>
