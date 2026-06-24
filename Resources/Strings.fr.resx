@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <data name="AppTitle">
+    <value>ShortcutWheel - Configuration</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · Configuration</value>
+  </data>
+  <data name="AppHeader">
+    <value>ShortcutWheel Configuration</value>
+  </data>
+  <data name="TabShortcuts">
+    <value>Raccourcis</value>
+  </data>
+  <data name="TabSettings">
+    <value>Paramètres</value>
+  </data>
+  <data name="BtnAddFile">
+    <value>+ Ajouter fichier</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ Ajouter dossier</value>
+  </data>
+  <data name="BtnDelete">
+    <value>Supprimer</value>
+  </data>
+  <data name="StatusReady">
+    <value>Prêt</value>
+  </data>
+  <data name="PropHeader">
+    <value>Propriétés</value>
+  </data>
+  <data name="PropLabel">
+    <value>Nom</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>Chemin cible</value>
+  </data>
+  <data name="PropArguments">
+    <value>Arguments</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>Répertoire de travail</value>
+  </data>
+  <data name="PropBrowse">
+    <value>Parcourir...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>Est un dossier</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>Contient des sous-éléments</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>Enregistrer</value>
+  </data>
+  <data name="SectionHotkey">
+    <value>Raccourci clavier</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>Modificateurs</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>Touche</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>Bouton souris</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>Activer le bouton latéral</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>Bouton</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>Délai de maintien</value>
+  </data>
+  <data name="SectionAppearance">
+    <value>Apparence</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>Rayon de la roue</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>Opacité</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>Couleur d'accentuation</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>Couleur de fond</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>Image de fond</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>Opacité de l'image</value>
+  </data>
+  <data name="SectionGeneral">
+    <value>Général</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>Démarrer avec Windows</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>Démarrer réduit dans la barre</value>
+  </data>
+  <data name="SectionUpdate">
+    <value>Mise à jour</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>Version actuelle</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>Vérifier les mises à jour</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>Vérification automatique</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>Mise à jour silencieuse</value>
+  </data>
+  <data name="SectionAbout">
+    <value>À propos</value>
+  </data>
+  <data name="AboutDescription">
+    <value>Lanceur radial Windows style CSGO</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub : </value>
+  </data>
+  <data name="SectionLanguage">
+    <value>Langue</value>
+  </data>
+  <data name="DeleteConfirmTitle">
+    <value>Confirmer la suppression</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>Supprimer '{0}' ?</value>
+  </data>
+  <data name="AddedStatus">
+    <value>Ajouté : {0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>{0} élément(s) ajouté(s)</value>
+  </data>
+  <data name="MovedStatus">
+    <value>Déplacé : {0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>Supprimé : {0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>Vérification...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>À jour (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>Nouvelle version : {0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>Échec : {0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>Sélectionner une application ou un raccourci</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>Sélectionner la cible</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>Sélectionner l'image de fond</value>
+  </data>
+  <data name="TrayExit">
+    <value>Quitter</value>
+  </data>
+  <data name="TrayReload">
+    <value>Recharger la config</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>Configurer</value>
+  </data>
+  <data name="StartupBody">
+    <value>Appuyez sur Ctrl+Alt+Space pour ouvrir la roue</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>ShortcutWheel — Ctrl+Alt+Space pour ouvrir</value>
+  </data>
+  <data name="StartupTitle">
+    <value>ShortcutWheel démarré</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>Vérifier les mises à jour</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>Échec de l'enregistrement du raccourci</value>
+  </data>
+  <data name="TrayHelp">
+    <value>Aide</value>
+  </data>
+</root>

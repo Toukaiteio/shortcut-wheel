@@ -13,8 +13,10 @@ namespace ShortcutWheel.Views;
 public partial class ConfigWindow : Window
 {
     private readonly ConfigService _configService;
+    private readonly UpdateService _updateService = new();
     private readonly System.Collections.ObjectModel.ObservableCollection<ShortcutItemViewModel> _viewModels = new();
     private ShortcutItemViewModel? _selectedItem;
+    private UpdateInfo? _displayedUpdate;
 
     // Slider/CheckBox/TextBox events fire during InitializeComponent() and
     // again while LoadSettings() restores values. Both happen before the user
@@ -57,13 +59,21 @@ public partial class ConfigWindow : Window
         ShortcutTree.ItemsSource = _viewModels;
 
         Loaded += OnLoaded;
+        Closed += (_, _) => UpdateService.PendingUpdateChanged -= OnPendingUpdateChanged;
+        UpdateService.PendingUpdateChanged += OnPendingUpdateChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         LoadShortcuts();
         LoadSettings();
+        ShowPendingUpdate(UpdateService.PendingUpdate);
         _isLoaded = true;
+    }
+
+    private void OnPendingUpdateChanged(object? sender, UpdateInfo? info)
+    {
+        Dispatcher.Invoke(() => ShowPendingUpdate(info));
     }
 
     private void LoadShortcuts()
@@ -114,12 +124,21 @@ public partial class ConfigWindow : Window
         // General
         SetStartWithWindows.IsChecked = settings.StartWithWindows;
         SetRunMinimized.IsChecked = settings.RunMinimized;
+        SetCloseWheelAfterLaunch.IsChecked = settings.CloseWheelAfterLaunch;
 
         // Update section
         SetCurrentVersion.Text = "v" + Services.UpdateService.GetCurrentVersion();
         SetAutoUpdate.IsChecked = settings.AutoUpdateEnabled;
         SetSilentUpdate.IsChecked = settings.SilentUpdate;
         SetUpdateStatus.Text = "";
+
+        // Language
+        SetLanguage.ItemsSource = Services.LocalizationService.SupportedLanguages
+            .Select(l => l.DisplayName).ToList();
+        var currentCode = settings.Language ?? "";
+        int langIdx = Array.FindIndex(Services.LocalizationService.SupportedLanguages,
+            l => l.Code == currentCode);
+        SetLanguage.SelectedIndex = langIdx >= 0 ? langIdx : 0;
 
         // Background image
         SetBgImagePath.Text = settings.BackgroundImagePath ?? "";
@@ -142,6 +161,7 @@ public partial class ConfigWindow : Window
                 PropWorkDir.Text = _selectedItem.Item.WorkingDirectory ?? "";
                 PropIsFolder.IsChecked = _selectedItem.IsFolder;
                 PropHasChildren.IsChecked = _selectedItem.Children.Count > 0;
+                PropRunAsAdmin.IsChecked = _selectedItem.Item.RunAsAdmin;
                 PropBrowse.IsEnabled = true;
             }
             else
@@ -152,6 +172,7 @@ public partial class ConfigWindow : Window
                 PropWorkDir.Text = "";
                 PropIsFolder.IsChecked = false;
                 PropHasChildren.IsChecked = false;
+                PropRunAsAdmin.IsChecked = false;
                 PropBrowse.IsEnabled = false;
             }
         }
@@ -165,7 +186,7 @@ public partial class ConfigWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择应用程序或快捷方式 / Select an application or shortcut",
+            Title = LocalizationService.Get("SelectFileTitle"),
             Filter = "可执行文件与快捷方式 / Executables and shortcuts (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*"
         };
 
@@ -185,7 +206,7 @@ public partial class ConfigWindow : Window
 
         AddItemUnderSelection(item);
         _configService.Save();
-        UpdateStatus("Added new folder");
+        UpdateStatus(LocalizationService.Get("AddedStatus").Replace("{0}", "folder"));
     }
 
     /// <summary>
@@ -274,7 +295,7 @@ public partial class ConfigWindow : Window
     {
         if (_selectedItem == null) return;
 
-        var result = MessageBox.Show($"Delete '{_selectedItem.Label}'?", "Confirm",
+        var result = MessageBox.Show($"Delete '{_selectedItem.Label}'?", LocalizationService.Get("DeleteConfirmTitle"),
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes) return;
 
@@ -329,7 +350,7 @@ public partial class ConfigWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择目标 / Select target",
+            Title = LocalizationService.Get("SelectTargetTitle"),
             Filter = "可执行文件与快捷方式 / Executables and shortcuts (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*"
         };
 
@@ -387,9 +408,10 @@ public partial class ConfigWindow : Window
 
     /// <summary>
     /// Adds item(s) from file paths, resolving .lnk files asynchronously
-    /// so the UI thread is never blocked.
+    /// so the UI thread is never blocked. Always adds to root level unless
+    /// dropped directly onto a folder node.
     /// </summary>
-    private async void AddItemsFromPaths(IEnumerable<string> paths)
+    private async void AddItemsFromPaths(IEnumerable<string> paths, ShortcutItemViewModel? targetFolder = null)
     {
         foreach (var path in paths)
         {
@@ -419,7 +441,18 @@ public partial class ConfigWindow : Window
                     TargetPath = path
                 };
             }
-            AddItemUnderSelection(item);
+
+            // Only add to folder if explicitly dropped onto it, otherwise add to root
+            if (targetFolder != null && targetFolder.IsFolder)
+            {
+                targetFolder.AddChild(item);
+            }
+            else
+            {
+                _configService.Config.RootItems.Add(item);
+                var newVm = new ShortcutItemViewModel(item);
+                _viewModels.Add(newVm);
+            }
         }
         _configService.Save();
         UpdateStatus($"已添加 / Added {paths.Count()} item(s)");
@@ -622,7 +655,7 @@ public partial class ConfigWindow : Window
     {
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择背景图 / Select background image",
+            Title = LocalizationService.Get("SelectBgImageTitle"),
             Filter = "图片文件 / Images (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files (*.*)|*.*"
         };
         if (dlg.ShowDialog() == true)
@@ -641,6 +674,17 @@ public partial class ConfigWindow : Window
         _configService.SaveDebounced();
     }
 
+    private void SetLanguage_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        int idx = SetLanguage.SelectedIndex;
+        if (idx < 0 || idx >= Services.LocalizationService.SupportedLanguages.Length) return;
+        var code = Services.LocalizationService.SupportedLanguages[idx].Code;
+        _configService.Config.Settings.Language = string.IsNullOrEmpty(code) ? null : code;
+        Services.LocalizationService.SetLanguage(code);
+        _configService.SaveDebounced();
+    }
+
     private void SetSilentUpdate_Changed(object sender, RoutedEventArgs e)
     {
         if (!_isLoaded) return;
@@ -648,22 +692,38 @@ public partial class ConfigWindow : Window
         _configService.SaveDebounced();
     }
 
+    private void SetCloseWheelAfterLaunch_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        _configService.Config.Settings.CloseWheelAfterLaunch = SetCloseWheelAfterLaunch.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
+    private void PropRunAsAdmin_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isPopulatingProps) return;
+        if (_selectedItem == null) return;
+
+        _selectedItem.Item.RunAsAdmin = PropRunAsAdmin.IsChecked == true;
+        _configService.SaveDebounced();
+    }
+
     private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         BtnCheckUpdate.IsEnabled = false;
-        SetUpdateStatus.Text = "正在检查... / Checking...";
+        SetUpdateStatus.Text = LocalizationService.Get("UpdateChecking");
         try
         {
-            var svc = new Services.UpdateService();
-            var info = await svc.CheckForUpdatesAsync();
+            var info = await _updateService.CheckForUpdatesAsync();
             if (info != null)
             {
                 SetUpdateStatus.Text = $"发现新版本 / New version: {info.TagName}";
-                var dlg = new UpdateWindow(svc, info) { Owner = this };
-                dlg.Show();
+                Services.UpdateService.SetPendingUpdate(info);
+                ShowPendingUpdate(info);
             }
             else
             {
+                Services.UpdateService.SetPendingUpdate(null);
                 SetUpdateStatus.Text = $"已是最新 / Up to date (v{Services.UpdateService.GetCurrentVersion()})";
             }
         }
@@ -674,6 +734,78 @@ public partial class ConfigWindow : Window
         finally
         {
             BtnCheckUpdate.IsEnabled = true;
+        }
+    }
+
+    private void ShowPendingUpdate(UpdateInfo? info)
+    {
+        _displayedUpdate = info;
+        if (info == null)
+        {
+            UpdateNotice.Visibility = Visibility.Collapsed;
+            UpdateDownloadProgress.Visibility = Visibility.Collapsed;
+            UpdateDownloadProgress.Value = 0;
+            BtnUpdateView.IsEnabled = true;
+            BtnUpdateInstall.IsEnabled = true;
+            return;
+        }
+
+        string tag = string.IsNullOrWhiteSpace(info.TagName) ? "v" + info.Version : info.TagName;
+        UpdateNoticeVersion.Text = $"当前 v{Services.UpdateService.GetCurrentVersion()}，最新 {tag}。自动检查不会弹出窗口，可在这里处理更新。";
+        UpdateNotice.Visibility = Visibility.Visible;
+        SetUpdateStatus.Text = $"发现新版本 / New version: {tag}";
+    }
+
+    private void BtnUpdateView_Click(object sender, RoutedEventArgs e)
+    {
+        if (_displayedUpdate == null || string.IsNullOrEmpty(_displayedUpdate.ReleaseUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = _displayedUpdate.ReleaseUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            App.LogError($"Open release url failed: {ex.Message}");
+            SetUpdateStatus.Text = $"打开失败 / Failed: {ex.Message}";
+        }
+    }
+
+    private async void BtnUpdateInstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (_displayedUpdate == null) return;
+
+        BtnCheckUpdate.IsEnabled = false;
+        BtnUpdateView.IsEnabled = false;
+        BtnUpdateInstall.IsEnabled = false;
+        UpdateDownloadProgress.Value = 0;
+        UpdateDownloadProgress.Visibility = Visibility.Visible;
+        SetUpdateStatus.Text = "下载中... / Downloading...";
+
+        try
+        {
+            var progress = new Progress<double>(p =>
+            {
+                UpdateDownloadProgress.Value = p * 100;
+                SetUpdateStatus.Text = $"下载中 / Downloading... {p:P0}";
+            });
+
+            string temp = await _updateService.DownloadUpdateAsync(_displayedUpdate, progress);
+            SetUpdateStatus.Text = "下载完成，正在应用更新... / Applying...";
+            await Task.Delay(500);
+            _updateService.ApplyUpdateAndRestart(temp);
+        }
+        catch (Exception ex)
+        {
+            App.LogError($"Update download failed: {ex}");
+            SetUpdateStatus.Text = $"下载失败 / Failed: {ex.Message}";
+            BtnCheckUpdate.IsEnabled = true;
+            BtnUpdateView.IsEnabled = true;
+            BtnUpdateInstall.IsEnabled = true;
+            UpdateDownloadProgress.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -824,7 +956,12 @@ public partial class ConfigWindow : Window
 
             if (files != null)
             {
-                AddItemsFromPaths(files.Where(p => !string.IsNullOrEmpty(p))!);
+                // Check if dropped directly onto a folder node
+                var (_, dropTargetVm, dropPosition) = ComputeDropTarget(e);
+                var targetFolder = (dropTargetVm != null && dropTargetVm.IsFolder && dropPosition == DropIndicatorAdorner.DropPosition.Into)
+                    ? dropTargetVm
+                    : null;
+                AddItemsFromPaths(files.Where(p => !string.IsNullOrEmpty(p))!, targetFolder);
             }
             e.Handled = true;
             return;
@@ -1095,3 +1232,5 @@ public partial class ConfigWindow : Window
 
     #endregion
 }
+
+

@@ -1,0 +1,246 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <!-- App -->
+  <data name="AppTitle">
+    <value>ShortcutWheel · Configure</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · Configure</value>
+  </data>
+  <data name="AppHeader">
+    <value>ShortcutWheel Config</value>
+  </data>
+  <!-- Tabs -->
+  <data name="TabShortcuts">
+    <value>Shortcuts</value>
+  </data>
+  <data name="TabSettings">
+    <value>Settings</value>
+  </data>
+  <!-- Shortcuts tab -->
+  <data name="BtnAddFile">
+    <value>+ Add File</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ Add Folder</value>
+  </data>
+  <data name="BtnDelete">
+    <value>Delete</value>
+  </data>
+  <data name="StatusReady">
+    <value>Ready</value>
+  </data>
+  <!-- Properties panel -->
+  <data name="PropHeader">
+    <value>Properties</value>
+  </data>
+  <data name="PropLabel">
+    <value>Name / Label</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>Target Path</value>
+  </data>
+  <data name="PropArguments">
+    <value>Arguments</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>Working Directory</value>
+  </data>
+  <data name="PropBrowse">
+    <value>Browse...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>Is Folder</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>Has Sub-items</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>Save Config</value>
+  </data>
+  <!-- Settings: Hotkey -->
+  <data name="SectionHotkey">
+    <value>Hotkey</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>Modifiers</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>Key</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>Mouse side button</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>Enable mouse side button</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>Button</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>Hold delay</value>
+  </data>
+  <!-- Settings: Appearance -->
+  <data name="SectionAppearance">
+    <value>Appearance</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>Wheel radius</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>Opacity</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>Accent color</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>Background color</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>Background image</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>Image opacity</value>
+  </data>
+  <!-- Settings: General -->
+  <data name="SectionGeneral">
+    <value>General</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>Start with Windows</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>Start minimized to tray</value>
+  </data>
+  <data name="GeneralCloseWheelAfterLaunch">
+    <value>Close wheel after launching a shortcut</value>
+  </data>
+  <data name="PropRunAsAdmin">
+    <value>Run as administrator</value>
+  </data>
+  <!-- Settings: Update -->
+  <data name="SectionUpdate">
+    <value>Update</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>Current version</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>Check for updates</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>Auto-check for updates</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>Silent update (auto download &amp; install)</value>
+  </data>
+  <!-- Settings: About -->
+  <data name="SectionAbout">
+    <value>About</value>
+  </data>
+  <data name="AboutDescription">
+    <value>CSGO-style radial shortcut launcher for Windows</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub: </value>
+  </data>
+  <!-- Settings: Language -->
+  <data name="SectionLanguage">
+    <value>Language</value>
+  </data>
+  <!-- Dialogs -->
+  <data name="DeleteConfirmTitle">
+    <value>Confirm Delete</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>Delete '{0}'?</value>
+  </data>
+  <data name="AddedStatus">
+    <value>Added: {0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>Added {0} item(s)</value>
+  </data>
+  <data name="MovedStatus">
+    <value>Moved: {0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>Deleted: {0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>Checking...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>Up to date (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>New version: {0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>Check failed: {0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>Select application or shortcut</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>Select target</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>Select background image</value>
+  </data>
+  <data name="TrayExit">
+    <value>Exit</value>
+  </data>
+  <data name="TrayReload">
+    <value>Reload config</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>Configure</value>
+  </data>
+  <data name="StartupBody">
+    <value>Press Ctrl+Alt+Space to open the wheel\nOr hold mouse side button (default X1)\nRight-click tray icon to configure / exit</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>ShortcutWheel — Press Ctrl+Alt+Space (right-click for more)</value>
+  </data>
+  <data name="StartupTitle">
+    <value>ShortcutWheel started</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>Check for updates</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>Hotkey registration failed. Right-click tray icon → Configure</value>
+  </data>
+  <data name="TrayHelp">
+    <value>Help</value>
+  </data>
+</root>

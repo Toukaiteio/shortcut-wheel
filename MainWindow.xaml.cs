@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private ScreenService _screenService = null!;
     private UpdateService _updateService = null!;
     private OverlayWindow _overlayWindow = null!;
+    private ConfigWindow? _configWindow;
     private HwndSource? _hotkeyWindow;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
 
@@ -45,6 +46,8 @@ public partial class MainWindow : Window
     {
         _configService = new ConfigService();
         _configService.Load();
+        // Apply saved language preference, then push strings into ResourceDictionary.
+        Services.LocalizationService.SetLanguage(_configService.Config.Settings.Language);
         // Migrate any .lnk TargetPaths to real exe paths in the background.
         _ = _configService.MigrateLnkPathsAsync();
 
@@ -103,15 +106,13 @@ public partial class MainWindow : Window
     /// </summary>
     public void NotifyStartup()
     {
-        string title = "快捷转盘 已启动";
+        string title = Services.LocalizationService.Get("StartupTitle");
         string body = HotkeyRegistered
-            ? "按 Ctrl+Alt+Space 呼出转盘\n或按住鼠标侧键 (默认 X1)\n右键托盘图标可设置 / 退出"
-            : "热键注册失败，请右键托盘图标 → 配置";
+            ? Services.LocalizationService.Get("StartupBody")
+            : Services.LocalizationService.Get("StartupBodyFail");
 
-        // 1) Custom floating toast – guaranteed visible.
         Views.StartupToast.Show(title, body);
 
-        // 2) Best-effort balloon (may be silently dropped by Windows).
         if (_trayIcon != null)
         {
             _trayIcon.BalloonTipTitle = title;
@@ -129,25 +130,39 @@ public partial class MainWindow : Window
         {
             Icon = System.Drawing.Icon.ExtractAssociatedIcon(
                 System.Windows.Forms.Application.ExecutablePath),
-            Text = "快捷转盘 — 按 Ctrl+Alt+Space 打开 (右键查看更多)",
+            Text = Services.LocalizationService.Get("TrayTooltip"),
             Visible = true
         };
 
-        var menu = new System.Windows.Forms.ContextMenuStrip();
-        menu.Items.Add("显示帮助 / Show Help", null, (_, _) => ShowHelp());
-        menu.Items.Add("配置 / Configure", null, (_, _) => OpenConfig());
-        menu.Items.Add("重新加载配置 / Reload", null, (_, _) => ReloadConfig());
-        menu.Items.Add("检查更新 / Check for updates", null, async (_, _) => await CheckForUpdatesAsync(showWhenUpToDate: true));
-        menu.Items.Add("-");
-        menu.Items.Add("退出 / Exit", null, (_, _) => ExitApp());
+        BuildTrayMenu();
 
-        _trayIcon.ContextMenuStrip = menu;
+        // Rebuild tray menu when language changes.
+        Services.LocalizationService.LanguageChanged += (_, _) =>
+            Dispatcher.Invoke(BuildTrayMenu);
+
         _trayIcon.DoubleClick += (_, _) => OpenConfig();
         _trayIcon.MouseClick += (_, ev) =>
         {
             if (ev.Button == System.Windows.Forms.MouseButtons.Left)
                 NotifyStartup();
         };
+    }
+
+    private void BuildTrayMenu()
+    {
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add(Services.LocalizationService.Get("TrayHelp"), null, (_, _) => ShowHelp());
+        menu.Items.Add(Services.LocalizationService.Get("TrayConfigure"), null, (_, _) => OpenConfig());
+        menu.Items.Add(Services.LocalizationService.Get("TrayReload"), null, (_, _) => ReloadConfig());
+        menu.Items.Add(Services.LocalizationService.Get("TrayCheckUpdate"), null, async (_, _) => await CheckForUpdatesAsync(showWhenUpToDate: true));
+        menu.Items.Add("-");
+        menu.Items.Add(Services.LocalizationService.Get("TrayExit"), null, (_, _) => ExitApp());
+        if (_trayIcon != null)
+        {
+            _trayIcon.ContextMenuStrip?.Dispose();
+            _trayIcon.ContextMenuStrip = menu;
+            _trayIcon.Text = Services.LocalizationService.Get("TrayTooltip");
+        }
     }
 
     private void ShowHelp()
@@ -178,9 +193,19 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            var configWindow = new ConfigWindow(_configService);
-            configWindow.Show();
-            configWindow.Activate();
+            if (_configWindow == null)
+            {
+                _configWindow = new ConfigWindow(_configService);
+                _configWindow.Closed += (_, _) => _configWindow = null;
+            }
+
+            if (!_configWindow.IsVisible)
+                _configWindow.Show();
+
+            if (_configWindow.WindowState == WindowState.Minimized)
+                _configWindow.WindowState = WindowState.Normal;
+
+            _configWindow.Activate();
         });
     }
 
@@ -246,10 +271,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Auto-check with fullscreen app running: defer until screen is free.
-            if (!showWhenUpToDate && Services.UpdateService.IsFullscreenAppRunning())
+            if (!showWhenUpToDate)
             {
-                _ = DeferUpdatePopupAsync(info);
+                Services.UpdateService.SetPendingUpdate(info);
+                App.LogInfo($"Update available: {info.TagName}. Notification is shown in the config window.");
                 return;
             }
 
@@ -276,25 +301,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             App.LogError($"Silent update failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Polls every 5 minutes until no fullscreen app is detected, then shows
-    /// the update window. Gives up after 2 hours.
-    /// </summary>
-    private async System.Threading.Tasks.Task DeferUpdatePopupAsync(Services.UpdateInfo info)
-    {
-        const int intervalMs = 5 * 60 * 1000;
-        const int maxRetries = 24; // 2 hours
-        for (int i = 0; i < maxRetries; i++)
-        {
-            await System.Threading.Tasks.Task.Delay(intervalMs);
-            if (!Services.UpdateService.IsFullscreenAppRunning())
-            {
-                Dispatcher.Invoke(() => ShowUpdateWindow(info));
-                return;
-            }
         }
     }
 

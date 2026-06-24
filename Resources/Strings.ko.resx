@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter</value>
+  </resheader>
+  <data name="AppTitle">
+    <value>ShortcutWheel - 설정</value>
+  </data>
+  <data name="AppSubtitle">
+    <value>ShortcutWheel · 설정</value>
+  </data>
+  <data name="AppHeader">
+    <value>ShortcutWheel 설정 센터</value>
+  </data>
+  <data name="TabShortcuts">
+    <value>바로가기</value>
+  </data>
+  <data name="TabSettings">
+    <value>설정</value>
+  </data>
+  <data name="BtnAddFile">
+    <value>+ 파일 추가</value>
+  </data>
+  <data name="BtnAddFolder">
+    <value>+ 폴더 추가</value>
+  </data>
+  <data name="BtnDelete">
+    <value>삭제</value>
+  </data>
+  <data name="StatusReady">
+    <value>준비</value>
+  </data>
+  <data name="PropHeader">
+    <value>속성</value>
+  </data>
+  <data name="PropLabel">
+    <value>이름</value>
+  </data>
+  <data name="PropTargetPath">
+    <value>대상 경로</value>
+  </data>
+  <data name="PropArguments">
+    <value>인수</value>
+  </data>
+  <data name="PropWorkDir">
+    <value>작업 디렉터리</value>
+  </data>
+  <data name="PropBrowse">
+    <value>찾아보기...</value>
+  </data>
+  <data name="PropIsFolder">
+    <value>폴더</value>
+  </data>
+  <data name="PropHasChildren">
+    <value>하위 항목 있음</value>
+  </data>
+  <data name="BtnSaveConfig">
+    <value>설정 저장</value>
+  </data>
+  <data name="SectionHotkey">
+    <value>단축키</value>
+  </data>
+  <data name="HotkeyModifiers">
+    <value>수정자 키</value>
+  </data>
+  <data name="HotkeyKey">
+    <value>키</value>
+  </data>
+  <data name="HotkeyMouse">
+    <value>마우스 사이드 버튼</value>
+  </data>
+  <data name="HotkeyMouseEnable">
+    <value>마우스 사이드 버튼 활성화</value>
+  </data>
+  <data name="HotkeyButton">
+    <value>버튼</value>
+  </data>
+  <data name="HotkeyHoldDelay">
+    <value>길게 누르기 지연</value>
+  </data>
+  <data name="SectionAppearance">
+    <value>외관</value>
+  </data>
+  <data name="AppearanceWheelRadius">
+    <value>휠 반지름</value>
+  </data>
+  <data name="AppearanceOpacity">
+    <value>불투명도</value>
+  </data>
+  <data name="AppearanceAccentColor">
+    <value>강조 색상</value>
+  </data>
+  <data name="AppearanceBgColor">
+    <value>배경색</value>
+  </data>
+  <data name="AppearanceBgImage">
+    <value>배경 이미지</value>
+  </data>
+  <data name="AppearanceBgImageOpacity">
+    <value>이미지 불투명도</value>
+  </data>
+  <data name="SectionGeneral">
+    <value>일반</value>
+  </data>
+  <data name="GeneralStartWithWindows">
+    <value>Windows 시작 시 실행</value>
+  </data>
+  <data name="GeneralRunMinimized">
+    <value>트레이로 최소화하여 시작</value>
+  </data>
+  <data name="SectionUpdate">
+    <value>업데이트</value>
+  </data>
+  <data name="UpdateCurrentVersion">
+    <value>현재 버전</value>
+  </data>
+  <data name="UpdateCheck">
+    <value>업데이트 확인</value>
+  </data>
+  <data name="UpdateAutoCheck">
+    <value>자동 업데이트 확인</value>
+  </data>
+  <data name="UpdateSilent">
+    <value>자동 업데이트 (자동 다운로드 및 설치)</value>
+  </data>
+  <data name="SectionAbout">
+    <value>정보</value>
+  </data>
+  <data name="AboutDescription">
+    <value>Windows용 CSGO 스타일 방사형 런처</value>
+  </data>
+  <data name="AboutGitHub">
+    <value>GitHub: </value>
+  </data>
+  <data name="SectionLanguage">
+    <value>언어</value>
+  </data>
+  <data name="DeleteConfirmTitle">
+    <value>삭제 확인</value>
+  </data>
+  <data name="DeleteConfirmMsg">
+    <value>'{0}'을(를) 삭제하시겠습니까?</value>
+  </data>
+  <data name="AddedStatus">
+    <value>추가됨: {0}</value>
+  </data>
+  <data name="AddedMultiStatus">
+    <value>{0}개 항목 추가됨</value>
+  </data>
+  <data name="MovedStatus">
+    <value>이동됨: {0}</value>
+  </data>
+  <data name="DeletedStatus">
+    <value>삭제됨: {0}</value>
+  </data>
+  <data name="UpdateChecking">
+    <value>확인 중...</value>
+  </data>
+  <data name="UpdateUpToDate">
+    <value>최신 버전입니다 (v{0})</value>
+  </data>
+  <data name="UpdateAvailable">
+    <value>새 버전: {0}</value>
+  </data>
+  <data name="UpdateFailed">
+    <value>확인 실패: {0}</value>
+  </data>
+  <data name="SelectFileTitle">
+    <value>앱 또는 바로가기 선택</value>
+  </data>
+  <data name="SelectTargetTitle">
+    <value>대상 선택</value>
+  </data>
+  <data name="SelectBgImageTitle">
+    <value>배경 이미지 선택</value>
+  </data>
+  <data name="TrayExit">
+    <value>종료</value>
+  </data>
+  <data name="TrayReload">
+    <value>설정 다시 로드</value>
+  </data>
+  <data name="TrayConfigure">
+    <value>설정</value>
+  </data>
+  <data name="StartupBody">
+    <value>Ctrl+Alt+Space로 휠 열기</value>
+  </data>
+  <data name="TrayTooltip">
+    <value>ShortcutWheel — Ctrl+Alt+Space로 열기</value>
+  </data>
+  <data name="StartupTitle">
+    <value>ShortcutWheel 시작됨</value>
+  </data>
+  <data name="TrayCheckUpdate">
+    <value>업데이트 확인</value>
+  </data>
+  <data name="StartupBodyFail">
+    <value>단축키 등록 실패</value>
+  </data>
+  <data name="TrayHelp">
+    <value>도움말</value>
+  </data>
+</root>

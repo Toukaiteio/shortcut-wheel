@@ -2,6 +2,22 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.3.1] - 2026-06-24
+
+### Added
+- "Run as administrator" per-shortcut option: toggle in the property panel to
+  launch a specific shortcut with elevated privileges (uses the `runas` verb).
+- "Close wheel after launching a shortcut" setting: when enabled, the wheel
+  hides immediately after launching; when disabled, the wheel stays open so
+  you can keep interacting.
+
+### Changed
+- Shortcut launch moved to a background thread (`LaunchAsync`) so the wheel
+  closes instantly and shell resolution never blocks the UI render thread.
+- File drag-and-drop from Explorer onto the config tree now correctly adds
+  items under the folder node they were dropped on, instead of always adding
+  to root.
+
 ## [0.3.0] - 2026-05-22
 
 ### Added
