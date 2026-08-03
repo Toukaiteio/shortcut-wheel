@@ -53,8 +53,10 @@ cd ShortcutWheel
 dotnet build -c Release
 
 # 发布单文件 / Publish single-file
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 ```
+
+发布输出固定在本项目的 `publish` 目录（`ShortcutWheel\publish`），不要从仓库父目录另行创建发布目录。
 
 ## License
 

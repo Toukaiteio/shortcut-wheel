@@ -243,4 +243,7 @@
   <data name="TrayHelp">
     <value>Help</value>
   </data>
+  <data name="TrayHotkeys">
+    <value>Hotkey invocation</value>
+  </data>
 </root>

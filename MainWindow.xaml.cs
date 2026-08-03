@@ -23,8 +23,10 @@ public partial class MainWindow : Window
     private ConfigWindow? _configWindow;
     private HwndSource? _hotkeyWindow;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private bool _hotkeysEnabled = true;
 
     public bool HotkeyRegistered { get; private set; }
+    public bool HotkeysEnabled => _hotkeysEnabled;
 
     public MainWindow()
     {
@@ -151,6 +153,14 @@ public partial class MainWindow : Window
     private void BuildTrayMenu()
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        var hotkeyToggle = new System.Windows.Forms.ToolStripMenuItem
+        {
+            Text = Services.LocalizationService.Get("TrayHotkeys"),
+            Checked = _hotkeysEnabled
+        };
+        hotkeyToggle.Click += (_, _) => ToggleHotkeys();
+        menu.Items.Add(hotkeyToggle);
+        menu.Items.Add("-");
         menu.Items.Add(Services.LocalizationService.Get("TrayHelp"), null, (_, _) => ShowHelp());
         menu.Items.Add(Services.LocalizationService.Get("TrayConfigure"), null, (_, _) => OpenConfig());
         menu.Items.Add(Services.LocalizationService.Get("TrayReload"), null, (_, _) => ReloadConfig());
@@ -173,6 +183,7 @@ public partial class MainWindow : Window
             "• 或按住鼠标侧键 (默认 XButton1) 唤起\n" +
             "• 转盘出现后将快捷方式拖入扇区即可添加\n" +
             "• ESC 或点击空白区域关闭\n" +
+            "• 托盘菜单可快速禁用 / 启用快捷键\n" +
             "• 右键托盘图标可进入配置\n",
             "快捷转盘 - 帮助",
             MessageBoxButton.OK,
@@ -215,6 +226,14 @@ public partial class MainWindow : Window
         RefreshHotkeyRegistration();
     }
 
+    private void ToggleHotkeys()
+    {
+        _hotkeysEnabled = !_hotkeysEnabled;
+        RefreshHotkeyRegistration();
+        BuildTrayMenu();
+        App.LogInfo(_hotkeysEnabled ? "Global hotkeys enabled from tray." : "Global hotkeys disabled from tray.");
+    }
+
     /// <summary>
     /// Re-registers both the keyboard hotkey and the mouse-side-button hook
     /// from the latest config. Safe to call repeatedly — RegisterKeyboardHotkey
@@ -222,6 +241,14 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshHotkeyRegistration()
     {
+        if (!_hotkeysEnabled)
+        {
+            _hotkeyService.UnregisterKeyboardHotkey();
+            _hotkeyService.UnregisterMouseHotkey();
+            HotkeyRegistered = false;
+            return;
+        }
+
         var hotkey = _configService.Config.Settings.Hotkey;
         HotkeyRegistered = _hotkeyService.RegisterKeyboardHotkey(hotkey);
 

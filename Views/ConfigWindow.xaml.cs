@@ -59,9 +59,37 @@ public partial class ConfigWindow : Window
         ShortcutTree.ItemsSource = _viewModels;
 
         Loaded += OnLoaded;
-        Closed += (_, _) => UpdateService.PendingUpdateChanged -= OnPendingUpdateChanged;
+        Closed += (_, _) => {
+            UpdateService.PendingUpdateChanged -= OnPendingUpdateChanged;
+            _configService.ConfigChanged -= OnConfigChanged;
+        };
         UpdateService.PendingUpdateChanged += OnPendingUpdateChanged;
+        _configService.ConfigChanged += OnConfigChanged;
     }
+
+    private void OnConfigChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() => UpdateStatus("配置已自动保存 / Config saved automatically"));
+    }
+
+    private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+        {
+            this.DragMove();
+        }
+    }
+
+    private void BtnClose_Click(object sender, RoutedEventArgs e)
+    {
+        this.Close();
+    }
+
+    private void BtnMinimize_Click(object sender, RoutedEventArgs e)
+    {
+        this.WindowState = WindowState.Minimized;
+    }
+
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -586,6 +614,13 @@ public partial class ConfigWindow : Window
         if (!_isLoaded) return;
         _configService.Config.Settings.StartWithWindows = SetStartWithWindows.IsChecked == true;
         SetStartupWithWindows(SetStartWithWindows.IsChecked == true);
+        _configService.SaveDebounced();
+    }
+
+    private void SetRunMinimized_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded) return;
+        _configService.Config.Settings.RunMinimized = SetRunMinimized.IsChecked == true;
         _configService.SaveDebounced();
     }
 

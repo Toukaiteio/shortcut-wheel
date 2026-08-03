@@ -17,6 +17,9 @@ public partial class OverlayWindow : Window
     private string? _cachedBackgroundImagePath;
     private DateTime _cachedBackgroundImageWriteTimeUtc;
     private System.Windows.Media.Imaging.BitmapImage? _cachedBackgroundImage;
+    private double _pendingShowOpacity = 1.0;
+    private int _collapsedRenderBarrierFrames;
+    private bool _wheelClosing;
 
     private readonly Stack<List<ShortcutItem>> _navigationStack = new();
     private List<ShortcutItem> _currentItems = new();
@@ -50,6 +53,7 @@ public partial class OverlayWindow : Window
 
         RadialMenuControl.WedgeClicked += OnWedgeClicked;
         RadialMenuControl.CenterClicked += OnCenterClicked;
+        RadialMenuControl.CollapseCompleted += OnWheelCollapseCompleted;
     }
 
     /// <summary>
@@ -71,6 +75,10 @@ public partial class OverlayWindow : Window
         Show();
         UpdateLayout();
         Hide();
+        // Do not leave the pre-warm pass with a full-wheel visual cached in
+        // the hidden window. The first real activation must start collapsed,
+        // just like every activation after it.
+        RadialMenuControl.PrepareForShow();
         Left = origLeft;
         Top = origTop;
         Opacity = origOpacity;
@@ -116,11 +124,53 @@ public partial class OverlayWindow : Window
         });
     }
 
+    /// <summary>
+    /// Shows the newly-prepared visual tree for the first time before making
+    /// the window opaque. WPF can retain the previous full-wheel surface until
+    /// the next render pass, so starting the animation in the same call as
+    /// Show() is not sufficient to prevent a one-frame flash.
+    /// </summary>
+    private void StartWheelAnimationAfterCollapsedFrame(object? sender, EventArgs e)
+    {
+        if (!_wheelActive)
+        {
+            CompositionTarget.Rendering -= StartWheelAnimationAfterCollapsedFrame;
+            return;
+        }
+
+        if (_collapsedRenderBarrierFrames > 0)
+        {
+            // Keep the window transparent for several complete render passes.
+            // The first callback can happen before WPF has submitted the new
+            // child visual, so one callback is not a sufficient cache barrier.
+            _collapsedRenderBarrierFrames--;
+            RadialMenuControl.PrepareForShow();
+            return;
+        }
+
+        CompositionTarget.Rendering -= StartWheelAnimationAfterCollapsedFrame;
+        Opacity = _pendingShowOpacity;
+        RadialMenuControl.AnimateIn();
+    }
+
     public void ShowWheel()
     {
+        if (_wheelClosing)
+            return;
+
         if (_wheelActive)
         {
             HideWheel();
+            return;
+        }
+
+        // Hotkeys are global, but opening the wheel over an active game is
+        // usually accidental (especially with a mouse side button). Check at
+        // the last possible moment so the decision follows the current
+        // foreground window rather than a stale state from startup.
+        if (GameDetectionService.IsGameForeground())
+        {
+            App.LogInfo("Wheel activation suppressed while a game-like foreground window is active.");
             return;
         }
 
@@ -136,7 +186,8 @@ public partial class OverlayWindow : Window
 
         ApplyPalette(settings);
         ApplyBackgroundImage(settings, wheelRadius);
-        Opacity = Math.Clamp(settings.Opacity, 0.1, 1.0);
+        _pendingShowOpacity = Math.Clamp(settings.Opacity, 0.1, 1.0);
+        Opacity = 0.0;
 
         // Get cursor position using Win32
         NativeMethods.GetCursorPos(out NativeMethods.POINT cursorPos);
@@ -157,19 +208,54 @@ public partial class OverlayWindow : Window
         _pageIndex = 0;
         RadialMenuControl.SetItems(GetVisibleItems());
         RadialMenuControl.IsSubMenu = false;
-        RadialMenuControl.AnimateIn();
+        RadialMenuControl.PrepareForShow();
 
+        // Mark the wheel active before Show(). This prevents a second hotkey
+        // or a deactivation callback during the show transition from seeing a
+        // half-initialised wheel. Start the animation only after the collapsed
+        // first frame is on screen.
+        _wheelActive = true;
+        IsHitTestVisible = true;
         Show();
+        if (!_wheelActive)
+            return;
+
         Activate();
         Focus();
-        _wheelActive = true;
+        if (!_wheelActive)
+            return;
+
+        _collapsedRenderBarrierFrames = 2;
+        CompositionTarget.Rendering -= StartWheelAnimationAfterCollapsedFrame;
+        CompositionTarget.Rendering += StartWheelAnimationAfterCollapsedFrame;
     }
 
     public void HideWheel()
     {
         if (!_wheelActive) return;
         _wheelActive = false;
+        _wheelClosing = true;
+        _collapsedRenderBarrierFrames = 0;
+        CompositionTarget.Rendering -= StartWheelAnimationAfterCollapsedFrame;
+
+        // Keep the window alive until the radial menu has rendered its
+        // collapsed frame. This prevents WPF from caching an expanded wheel
+        // as the last surface and showing it briefly on the next activation.
+        IsHitTestVisible = false;
         RadialMenuControl.AnimateOut();
+    }
+
+    private void OnWheelCollapseCompleted(object? sender, EventArgs e)
+    {
+        if (!_wheelClosing)
+            return;
+
+        _wheelClosing = false;
+        _collapsedRenderBarrierFrames = 0;
+        Opacity = 0.0;
+        BgEllipseScale.ScaleX = 0.0;
+        BgEllipseScale.ScaleY = 0.0;
+        IsHitTestVisible = true;
 
         // Belt-and-suspenders. Hide() alone occasionally appears to "stick"
         // when the launched process steals focus mid-call, so we also drop
@@ -425,7 +511,7 @@ public partial class OverlayWindow : Window
 
     private void SyncBgImageClip(object? sender, EventArgs e)
     {
-        if (!_wheelActive)
+        if (!_wheelActive && !_wheelClosing)
         {
             CompositionTarget.Rendering -= SyncBgImageClip;
             return;

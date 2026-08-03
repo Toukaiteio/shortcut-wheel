@@ -226,4 +226,7 @@
   <data name="TrayHelp">
     <value>도움말</value>
   </data>
+  <data name="TrayHotkeys">
+    <value>단축키 호출</value>
+  </data>
 </root>

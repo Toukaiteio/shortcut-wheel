@@ -68,10 +68,20 @@ public class HotkeyService : IDisposable
 
     public void UnregisterMouseHotkey()
     {
+        CancelPendingHold();
+
         if (_hookId != IntPtr.Zero)
         {
             NativeMethods.UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
+        }
+    }
+
+    private void CancelPendingHold()
+    {
+        lock (_holdLock)
+        {
+            _holdCts?.Cancel();
         }
     }
 
