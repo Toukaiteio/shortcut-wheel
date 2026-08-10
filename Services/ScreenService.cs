@@ -23,14 +23,4 @@ public class ScreenService
 
         return new System.Windows.Point(left / dpiScale, top / dpiScale);
     }
-
-    public System.Windows.Forms.Screen GetScreenAtPoint(System.Windows.Point p)
-    {
-        return System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)p.X, (int)p.Y));
-    }
-
-    public System.Drawing.Rectangle GetWorkAreaAtPoint(System.Windows.Point p)
-    {
-        return GetScreenAtPoint(p).WorkingArea;
-    }
 }

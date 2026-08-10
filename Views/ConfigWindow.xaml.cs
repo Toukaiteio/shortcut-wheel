@@ -69,7 +69,7 @@ public partial class ConfigWindow : Window
 
     private void OnConfigChanged(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() => UpdateStatus("配置已自动保存 / Config saved automatically"));
+        Dispatcher.BeginInvoke(() => UpdateStatus("配置已自动保存 / Config saved automatically"));
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -101,7 +101,7 @@ public partial class ConfigWindow : Window
 
     private void OnPendingUpdateChanged(object? sender, UpdateInfo? info)
     {
-        Dispatcher.Invoke(() => ShowPendingUpdate(info));
+        Dispatcher.BeginInvoke(() => ShowPendingUpdate(info));
     }
 
     private void LoadShortcuts()

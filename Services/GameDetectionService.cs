@@ -62,7 +62,35 @@ public static class GameDetectionService
         "obs64", "obs32", "devenv", "code"
     };
 
+    // The foreground process/window rarely changes within a few hundred
+    // milliseconds, and detection (Process.Path, window inspection) is not
+    // free. Cache the last result for a short window so repeated ShowWheel
+    // calls don't re-run the expensive checks on the UI thread.
+    private static readonly object _cacheLock = new();
+    private static long _lastCheckTicks;
+    private static bool _lastResult;
+    private const long CacheTtlMs = 200;
+
     public static bool IsGameForeground()
+    {
+        long now = Environment.TickCount64;
+        lock (_cacheLock)
+        {
+            if (now - _lastCheckTicks < CacheTtlMs)
+                return _lastResult;
+        }
+
+        bool result = ComputeIsGameForeground();
+
+        lock (_cacheLock)
+        {
+            _lastCheckTicks = now;
+            _lastResult = result;
+        }
+        return result;
+    }
+
+    private static bool ComputeIsGameForeground()
     {
         try
         {
@@ -130,7 +158,18 @@ public static class GameDetectionService
 
     private static string TryGetProcessPath(Process process)
     {
-        try { return process.MainModule?.FileName ?? string.Empty; }
+        // QueryFullProcessImageName reads the native process image path
+        // directly and is far cheaper / less likely to stall than
+        // Process.MainModule, which enumerates loaded modules and can block
+        // on protected processes.
+        try
+        {
+            var buffer = new StringBuilder(1024);
+            uint size = (uint)buffer.Capacity;
+            return NativeMethods.QueryFullProcessImageName(process.Handle, 0, buffer, ref size)
+                ? buffer.ToString()
+                : string.Empty;
+        }
         catch { return string.Empty; }
     }
 

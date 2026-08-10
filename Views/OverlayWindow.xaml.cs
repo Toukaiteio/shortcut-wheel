@@ -89,39 +89,36 @@ public partial class OverlayWindow : Window
         ShowWheel();
     }
 
-    private void OnWheelDismissed(object? sender, EventArgs e)
+private void OnWheelDismissed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
-        {
-            if (!_wheelActive) return;
+        // HotkeyService already marshals WheelDismissed to the UI thread
+        // (BeginInvoke from the hook thread), so this runs on the UI thread.
+        if (!_wheelActive) return;
 
-            // CSGO-style press-and-release select: if the cursor is over a
-            // wedge when the mouse side button is released, treat it as a
-            // click on that wedge. If the cursor is on the centre disc,
-            // navigate back. If the cursor is outside the wheel, keep the
-            // wheel OPEN so the user can continue interacting with the mouse
-            // — releasing the side button no longer dismisses the wheel.
-            var pos = Mouse.GetPosition(RadialMenuControl);
-            int idx = RadialMenuControl.HitTestWedge(pos);
-            if (idx >= 0)
-            {
-                OnWedgeClicked(this, idx);
-            }
-            else if (idx == -2)
-            {
-                NavigateBack();
-            }
-            // idx == -1: leave the wheel visible.
-        });
+        // CSGO-style press-and-release select: if the cursor is over a
+        // wedge when the mouse side button is released, treat it as a
+        // click on that wedge. If the cursor is on the centre disc,
+        // navigate back. If the cursor is outside the wheel, keep the
+        // wheel OPEN so the user can continue interacting with the mouse
+        // — releasing the side button no longer dismisses the wheel.
+        var pos = Mouse.GetPosition(RadialMenuControl);
+        int idx = RadialMenuControl.HitTestWedge(pos);
+        if (idx >= 0)
+        {
+            OnWedgeClicked(this, idx);
+        }
+        else if (idx == -2)
+        {
+            NavigateBack();
+        }
+        // idx == -1: leave the wheel visible.
     }
 
     private void OnWheelVisibilityChanged(bool visible)
     {
-        Dispatcher.Invoke(() =>
-        {
-            if (visible) ShowWheel();
-            else HideWheel();
-        });
+        // HotkeyService marshals this to the UI thread already.
+        if (visible) ShowWheel();
+        else HideWheel();
     }
 
     /// <summary>
@@ -629,52 +626,59 @@ public partial class OverlayWindow : Window
     private async System.Threading.Tasks.Task ResolveAndAddDroppedFilesAsync(
         string[] files, int wedgeIndex, List<ShortcutItem> visible)
     {
-        foreach (string file in files)
+        try
         {
-            ShortcutItem item;
-            if (ShortcutResolver.IsShortcut(file))
+            foreach (string file in files)
             {
-                var info = await ShortcutResolver.ResolveAsync(file);
-                item = info != null
-                    ? new ShortcutItem
-                    {
-                        Label = Path.GetFileNameWithoutExtension(file),
-                        TargetPath = info.TargetPath,
-                        Arguments = info.Arguments,
-                        WorkingDirectory = info.WorkingDirectory
-                    }
-                    : new ShortcutItem
+                ShortcutItem item;
+                if (ShortcutResolver.IsShortcut(file))
+                {
+                    var info = await ShortcutResolver.ResolveAsync(file);
+                    item = info != null
+                        ? new ShortcutItem
+                        {
+                            Label = Path.GetFileNameWithoutExtension(file),
+                            TargetPath = info.TargetPath,
+                            Arguments = info.Arguments,
+                            WorkingDirectory = info.WorkingDirectory
+                        }
+                        : new ShortcutItem
+                        {
+                            Label = Path.GetFileNameWithoutExtension(file),
+                            TargetPath = file
+                        };
+                }
+                else
+                {
+                    item = new ShortcutItem
                     {
                         Label = Path.GetFileNameWithoutExtension(file),
                         TargetPath = file
                     };
-            }
-            else
-            {
-                item = new ShortcutItem
+                }
+
+                if (wedgeIndex >= 0 && wedgeIndex < visible.Count &&
+                    !ReferenceEquals(visible[wedgeIndex], NextPageMarker) &&
+                    visible[wedgeIndex].IsFolder)
                 {
-                    Label = Path.GetFileNameWithoutExtension(file),
-                    TargetPath = file
-                };
+                    visible[wedgeIndex].Children.Add(item);
+                }
+                else
+                {
+                    _currentItems.Add(item);
+                    if (_navigationStack.Count == 0)
+                        _configService.Config.RootItems.Add(item);
+                }
             }
 
-            if (wedgeIndex >= 0 && wedgeIndex < visible.Count &&
-                !ReferenceEquals(visible[wedgeIndex], NextPageMarker) &&
-                visible[wedgeIndex].IsFolder)
-            {
-                visible[wedgeIndex].Children.Add(item);
-            }
-            else
-            {
-                _currentItems.Add(item);
-                if (_navigationStack.Count == 0)
-                    _configService.Config.RootItems.Add(item);
-            }
+            _configService.Save();
+            RadialMenuControl.SetItems(GetVisibleItems());
+            RadialMenuControl.InvalidateVisual();
         }
-
-        _configService.Save();
-        RadialMenuControl.SetItems(GetVisibleItems());
-        RadialMenuControl.InvalidateVisual();
+        catch (Exception ex)
+        {
+            App.LogError($"Failed to add dropped files: {ex}");
+        }
     }
 
     #endregion

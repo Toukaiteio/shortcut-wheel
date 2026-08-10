@@ -75,9 +75,11 @@ public partial class MainWindow : Window
         RefreshHotkeyRegistration();
 
         // Auto-reapply hotkeys whenever the config is saved (e.g. user changes
-        // the modifiers, key, or mouse-button in ConfigWindow).
+        // the modifiers, key, or mouse-button in ConfigWindow). The event is
+        // raised from a thread-pool thread (debounced save), so marshal back
+        // asynchronously — never block the pool thread on the UI thread.
         _configService.ConfigChanged += (_, _) =>
-            Dispatcher.Invoke(RefreshHotkeyRegistration);
+            Dispatcher.BeginInvoke(RefreshHotkeyRegistration);
 
         SetupSystemTray();
 
@@ -138,9 +140,9 @@ public partial class MainWindow : Window
 
         BuildTrayMenu();
 
-        // Rebuild tray menu when language changes.
-        Services.LocalizationService.LanguageChanged += (_, _) =>
-            Dispatcher.Invoke(BuildTrayMenu);
+        // Rebuild tray menu when language changes. SetLanguage is only ever
+        // called on the UI thread, so this handler already runs on the UI thread.
+        Services.LocalizationService.LanguageChanged += (_, _) => BuildTrayMenu();
 
         _trayIcon.DoubleClick += (_, _) => OpenConfig();
         _trayIcon.MouseClick += (_, ev) =>
@@ -202,22 +204,21 @@ public partial class MainWindow : Window
 
     private void OpenConfig()
     {
-        Dispatcher.Invoke(() =>
+        // Invoked from tray events, which fire on the UI thread (the NotifyIcon
+        // was created and pumped there), so no marshalling is needed.
+        if (_configWindow == null)
         {
-            if (_configWindow == null)
-            {
-                _configWindow = new ConfigWindow(_configService);
-                _configWindow.Closed += (_, _) => _configWindow = null;
-            }
+            _configWindow = new ConfigWindow(_configService);
+            _configWindow.Closed += (_, _) => _configWindow = null;
+        }
 
-            if (!_configWindow.IsVisible)
-                _configWindow.Show();
+        if (!_configWindow.IsVisible)
+            _configWindow.Show();
 
-            if (_configWindow.WindowState == WindowState.Minimized)
-                _configWindow.WindowState = WindowState.Normal;
+        if (_configWindow.WindowState == WindowState.Minimized)
+            _configWindow.WindowState = WindowState.Normal;
 
-            _configWindow.Activate();
-        });
+        _configWindow.Activate();
     }
 
     private void ReloadConfig()
@@ -277,36 +278,35 @@ public partial class MainWindow : Window
     /// </summary>
     public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool showWhenUpToDate = false)
     {
+        // CheckForUpdatesAsync is always awaited from the UI thread, so after
+        // the await we are back on the UI thread and can touch UI directly.
         var info = await _updateService.CheckForUpdatesAsync();
         bool silent = _configService.Config.Settings.SilentUpdate;
 
-        Dispatcher.Invoke(() =>
+        if (info == null)
         {
-            if (info == null)
-            {
-                if (showWhenUpToDate)
-                    MessageBox.Show(
-                        $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
-                        "ShortcutWheel", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+            if (showWhenUpToDate)
+                MessageBox.Show(
+                    $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
+                    "ShortcutWheel", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-            // Silent update: download and apply without any UI.
-            if (silent && !showWhenUpToDate)
-            {
-                _ = SilentInstallAsync(info);
-                return;
-            }
+        // Silent update: download and apply without any UI.
+        if (silent && !showWhenUpToDate)
+        {
+            _ = SilentInstallAsync(info);
+            return;
+        }
 
-            if (!showWhenUpToDate)
-            {
-                Services.UpdateService.SetPendingUpdate(info);
-                App.LogInfo($"Update available: {info.TagName}. Notification is shown in the config window.");
-                return;
-            }
+        if (!showWhenUpToDate)
+        {
+            Services.UpdateService.SetPendingUpdate(info);
+            App.LogInfo($"Update available: {info.TagName}. Notification is shown in the config window.");
+            return;
+        }
 
-            ShowUpdateWindow(info);
-        });
+        ShowUpdateWindow(info);
     }
 
     private void ShowUpdateWindow(Services.UpdateInfo info)

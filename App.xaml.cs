@@ -71,22 +71,26 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    internal static void LogInfo(string message)
-    {
-        try
-        {
-            string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shortcutwheel.log");
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
-        }
-        catch { }
-    }
+    // Logs may be appended from the UI thread, the mouse-hook thread and pool
+    // threads, so serialize access. Cap the file so it cannot grow unbounded.
+    private static readonly object LogLock = new();
+    private const long MaxLogSize = 2 * 1024 * 1024;
 
-    internal static void LogError(string message)
+    internal static void LogInfo(string message) => WriteLog("shortcutwheel.log", message);
+
+    internal static void LogError(string message) => WriteLog("error.log", message);
+
+    private static void WriteLog(string fileName, string message)
     {
         try
         {
-            string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log");
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+            lock (LogLock)
+            {
+                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                if (new FileInfo(logPath).Exists && new FileInfo(logPath).Length > MaxLogSize)
+                    File.WriteAllText(logPath, "");
+                File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+            }
         }
         catch { }
     }
