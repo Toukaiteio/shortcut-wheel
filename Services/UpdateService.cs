@@ -177,34 +177,6 @@ public class UpdateService
         return asm.GetName().Version?.ToString(3) ?? "0.0.0";
     }
 
-    /// <summary>
-    /// Returns true if any window on the primary monitor is running in
-    /// exclusive fullscreen (window rect == monitor rect).
-    /// </summary>
-    public static bool IsFullscreenAppRunning()
-    {
-        try
-        {
-            IntPtr fg = NativeMethods.GetForegroundWindow();
-            if (fg == IntPtr.Zero) return false;
-
-            if (!NativeMethods.GetWindowRect(fg, out var wr)) return false;
-
-            // Get the monitor the foreground window is on.
-            IntPtr monitor = NativeMethods.MonitorFromWindow(fg, NativeMethods.MONITOR_DEFAULTTONEAREST);
-            if (monitor == IntPtr.Zero) return false;
-
-            // Use SystemParameters for the monitor work area as a quick proxy.
-            // A true fullscreen window covers the entire monitor including taskbar.
-            int sw = (int)System.Windows.SystemParameters.PrimaryScreenWidth;
-            int sh = (int)System.Windows.SystemParameters.PrimaryScreenHeight;
-
-            return wr.Left <= 0 && wr.Top <= 0 &&
-                   wr.Right >= sw && wr.Bottom >= sh;
-        }
-        catch { return false; }
-    }
-
     private static bool IsNewer(string remote, string local)
     {
         if (Version.TryParse(remote, out var rv) && Version.TryParse(local, out var lv))

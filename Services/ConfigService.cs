@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Windows;
 using ShortcutWheel.Models;
 
 namespace ShortcutWheel.Services;
@@ -70,19 +71,11 @@ public class ConfigService
 
     public void Save()
     {
-        lock (_saveLock)
-        {
-            Directory.CreateDirectory(_configDir);
-
-            string tmpPath = _configFilePath + ".tmp";
-            string json = JsonSerializer.Serialize(Config, JsonOptions);
-            File.WriteAllText(tmpPath, json);
-
-            if (File.Exists(_configFilePath))
-                File.Replace(tmpPath, _configFilePath, null);
-            else
-                File.Move(tmpPath, _configFilePath);
-        }
+        // All direct callers run on the UI thread, and the Config tree is only
+        // mutated there — so serializing the live tree here is single-threaded.
+        // The atomic file write is shared with the debounced path via a lock.
+        string json = JsonSerializer.Serialize(Config, JsonOptions);
+        WriteAtomic(json);
     }
 
     public void SaveDebounced()
@@ -103,7 +96,18 @@ public class ConfigService
         try
         {
             await Task.Delay(500, cts.Token);
-            Save();
+
+            // The Config tree is mutated exclusively on the UI thread, so
+            // serialize it there — the write never reads a concurrently
+            // mutating tree from another thread. The file I/O itself stays off
+            // the UI thread. Awaiting InvokeAsync does not block this thread.
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return; // shutting down
+
+            string json = await dispatcher.InvokeAsync(() =>
+                JsonSerializer.Serialize(Config, JsonOptions));
+            WriteAtomic(json);
             ConfigChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
@@ -125,14 +129,42 @@ public class ConfigService
     }
 
     /// <summary>
+    /// Writes <paramref name="json"/> to the config file atomically. All
+    /// writers (UI-thread direct saves and the debounced pool-thread write)
+    /// go through this single lock.
+    /// </summary>
+    private void WriteAtomic(string json)
+    {
+        lock (_saveLock)
+        {
+            Directory.CreateDirectory(_configDir);
+
+            string tmpPath = _configFilePath + ".tmp";
+            File.WriteAllText(tmpPath, json);
+
+            if (File.Exists(_configFilePath))
+                File.Replace(tmpPath, _configFilePath, null);
+            else
+                File.Move(tmpPath, _configFilePath);
+        }
+    }
+
+    /// <summary>
     /// Scans all items for .lnk TargetPaths and resolves them to the real
     /// executable path in the background. Saves once if any items changed.
     /// Safe to call fire-and-forget from the UI thread.
     /// </summary>
     public async Task MigrateLnkPathsAsync()
     {
-        bool changed = await MigrateItemsAsync(Config.RootItems);
-        if (changed) Save();
+        try
+        {
+            bool changed = await MigrateItemsAsync(Config.RootItems);
+            if (changed) Save();
+        }
+        catch (Exception ex)
+        {
+            App.LogError($"Lnk path migration failed: {ex}");
+        }
     }
 
     private static async Task<bool> MigrateItemsAsync(IList<ShortcutItem> items)

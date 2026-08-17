@@ -2,6 +2,22 @@
 
 All notable changes to ShortcutWheel are documented here.
 
+## [0.3.2] - 2026-08-03
+
+### Added
+- Added a tray-menu toggle for quickly enabling or disabling keyboard and
+  mouse hotkey invocation, with the checked state showing whether it is on.
+- Added stronger game-foreground detection to suppress accidental wheel
+  activation over fullscreen and borderless game windows.
+
+### Changed
+- Unified publishing so the checked-in `publish` directory is the only
+  release output directory.
+- Improved the wheel animation lifecycle: opening starts from a collapsed
+  frame, and closing plays a collapse animation before the overlay is hidden.
+- Clarified the tray-menu hotkey item so its label stays as "Hotkey invocation"
+  while the check mark communicates the enabled state.
+
 ## [0.3.1] - 2026-06-24
 
 ### Added

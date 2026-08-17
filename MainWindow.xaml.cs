@@ -23,8 +23,10 @@ public partial class MainWindow : Window
     private ConfigWindow? _configWindow;
     private HwndSource? _hotkeyWindow;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private bool _hotkeysEnabled = true;
 
     public bool HotkeyRegistered { get; private set; }
+    public bool HotkeysEnabled => _hotkeysEnabled;
 
     public MainWindow()
     {
@@ -73,9 +75,11 @@ public partial class MainWindow : Window
         RefreshHotkeyRegistration();
 
         // Auto-reapply hotkeys whenever the config is saved (e.g. user changes
-        // the modifiers, key, or mouse-button in ConfigWindow).
+        // the modifiers, key, or mouse-button in ConfigWindow). The event is
+        // raised from a thread-pool thread (debounced save), so marshal back
+        // asynchronously — never block the pool thread on the UI thread.
         _configService.ConfigChanged += (_, _) =>
-            Dispatcher.Invoke(RefreshHotkeyRegistration);
+            Dispatcher.BeginInvoke(RefreshHotkeyRegistration);
 
         SetupSystemTray();
 
@@ -136,9 +140,9 @@ public partial class MainWindow : Window
 
         BuildTrayMenu();
 
-        // Rebuild tray menu when language changes.
-        Services.LocalizationService.LanguageChanged += (_, _) =>
-            Dispatcher.Invoke(BuildTrayMenu);
+        // Rebuild tray menu when language changes. SetLanguage is only ever
+        // called on the UI thread, so this handler already runs on the UI thread.
+        Services.LocalizationService.LanguageChanged += (_, _) => BuildTrayMenu();
 
         _trayIcon.DoubleClick += (_, _) => OpenConfig();
         _trayIcon.MouseClick += (_, ev) =>
@@ -151,6 +155,14 @@ public partial class MainWindow : Window
     private void BuildTrayMenu()
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        var hotkeyToggle = new System.Windows.Forms.ToolStripMenuItem
+        {
+            Text = Services.LocalizationService.Get("TrayHotkeys"),
+            Checked = _hotkeysEnabled
+        };
+        hotkeyToggle.Click += (_, _) => ToggleHotkeys();
+        menu.Items.Add(hotkeyToggle);
+        menu.Items.Add("-");
         menu.Items.Add(Services.LocalizationService.Get("TrayHelp"), null, (_, _) => ShowHelp());
         menu.Items.Add(Services.LocalizationService.Get("TrayConfigure"), null, (_, _) => OpenConfig());
         menu.Items.Add(Services.LocalizationService.Get("TrayReload"), null, (_, _) => ReloadConfig());
@@ -173,6 +185,7 @@ public partial class MainWindow : Window
             "• 或按住鼠标侧键 (默认 XButton1) 唤起\n" +
             "• 转盘出现后将快捷方式拖入扇区即可添加\n" +
             "• ESC 或点击空白区域关闭\n" +
+            "• 托盘菜单可快速禁用 / 启用快捷键\n" +
             "• 右键托盘图标可进入配置\n",
             "快捷转盘 - 帮助",
             MessageBoxButton.OK,
@@ -191,28 +204,35 @@ public partial class MainWindow : Window
 
     private void OpenConfig()
     {
-        Dispatcher.Invoke(() =>
+        // Invoked from tray events, which fire on the UI thread (the NotifyIcon
+        // was created and pumped there), so no marshalling is needed.
+        if (_configWindow == null)
         {
-            if (_configWindow == null)
-            {
-                _configWindow = new ConfigWindow(_configService);
-                _configWindow.Closed += (_, _) => _configWindow = null;
-            }
+            _configWindow = new ConfigWindow(_configService);
+            _configWindow.Closed += (_, _) => _configWindow = null;
+        }
 
-            if (!_configWindow.IsVisible)
-                _configWindow.Show();
+        if (!_configWindow.IsVisible)
+            _configWindow.Show();
 
-            if (_configWindow.WindowState == WindowState.Minimized)
-                _configWindow.WindowState = WindowState.Normal;
+        if (_configWindow.WindowState == WindowState.Minimized)
+            _configWindow.WindowState = WindowState.Normal;
 
-            _configWindow.Activate();
-        });
+        _configWindow.Activate();
     }
 
     private void ReloadConfig()
     {
         _configService.Load();
         RefreshHotkeyRegistration();
+    }
+
+    private void ToggleHotkeys()
+    {
+        _hotkeysEnabled = !_hotkeysEnabled;
+        RefreshHotkeyRegistration();
+        BuildTrayMenu();
+        App.LogInfo(_hotkeysEnabled ? "Global hotkeys enabled from tray." : "Global hotkeys disabled from tray.");
     }
 
     /// <summary>
@@ -222,6 +242,14 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshHotkeyRegistration()
     {
+        if (!_hotkeysEnabled)
+        {
+            _hotkeyService.UnregisterKeyboardHotkey();
+            _hotkeyService.UnregisterMouseHotkey();
+            HotkeyRegistered = false;
+            return;
+        }
+
         var hotkey = _configService.Config.Settings.Hotkey;
         HotkeyRegistered = _hotkeyService.RegisterKeyboardHotkey(hotkey);
 
@@ -250,36 +278,35 @@ public partial class MainWindow : Window
     /// </summary>
     public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool showWhenUpToDate = false)
     {
+        // CheckForUpdatesAsync is always awaited from the UI thread, so after
+        // the await we are back on the UI thread and can touch UI directly.
         var info = await _updateService.CheckForUpdatesAsync();
         bool silent = _configService.Config.Settings.SilentUpdate;
 
-        Dispatcher.Invoke(() =>
+        if (info == null)
         {
-            if (info == null)
-            {
-                if (showWhenUpToDate)
-                    MessageBox.Show(
-                        $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
-                        "ShortcutWheel", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+            if (showWhenUpToDate)
+                MessageBox.Show(
+                    $"已是最新版本 (v{Services.UpdateService.GetCurrentVersion()})\nYou are on the latest version.",
+                    "ShortcutWheel", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-            // Silent update: download and apply without any UI.
-            if (silent && !showWhenUpToDate)
-            {
-                _ = SilentInstallAsync(info);
-                return;
-            }
+        // Silent update: download and apply without any UI.
+        if (silent && !showWhenUpToDate)
+        {
+            _ = SilentInstallAsync(info);
+            return;
+        }
 
-            if (!showWhenUpToDate)
-            {
-                Services.UpdateService.SetPendingUpdate(info);
-                App.LogInfo($"Update available: {info.TagName}. Notification is shown in the config window.");
-                return;
-            }
+        if (!showWhenUpToDate)
+        {
+            Services.UpdateService.SetPendingUpdate(info);
+            App.LogInfo($"Update available: {info.TagName}. Notification is shown in the config window.");
+            return;
+        }
 
-            ShowUpdateWindow(info);
-        });
+        ShowUpdateWindow(info);
     }
 
     private void ShowUpdateWindow(Services.UpdateInfo info)

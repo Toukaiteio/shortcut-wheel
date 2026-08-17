@@ -7,29 +7,6 @@ namespace ShortcutWheel.Services;
 public class LaunchService
 {
     /// <summary>
-    /// Launches the shortcut synchronously. Prefer <see cref="LaunchAsync"/>
-    /// from the UI thread to avoid blocking while the shell resolves the
-    /// target (especially PATH-only names like "code" or URI schemes).
-    /// </summary>
-    public bool Launch(ShortcutItem item)
-    {
-        string? target = item.TargetPath;
-        if (string.IsNullOrEmpty(target))
-            return false;
-
-        try
-        {
-            using var process = CreateProcess(target, item.Arguments, item.WorkingDirectory, item.RunAsAdmin);
-            return process.Start();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Failed to launch {item.TargetPath}: {ex.Message}");
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Launches the shortcut on a background thread. Use this from UI event
     /// handlers so the wheel closes instantly and the target process startup
     /// never freezes the render thread.

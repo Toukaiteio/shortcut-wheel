@@ -9,11 +9,18 @@ namespace ShortcutWheel.Services;
 public class HotkeyService : IDisposable
 {
     private readonly int _hotkeyId = 9001;
-    private IntPtr _hookId = IntPtr.Zero;
+    private volatile IntPtr _hookId = IntPtr.Zero;
     private NativeMethods.LowLevelMouseProc? _mouseProc;
     private CancellationTokenSource? _holdCts;
     private readonly object _holdLock = new();
-    private HotkeyConfig? _config;
+    private volatile HotkeyConfig? _config;
+
+    // The low-level mouse hook is hosted on a dedicated STA thread with its
+    // own message pump. WH_MOUSE_LL delivers every system mouse event to the
+    // installing thread synchronously, so keeping it on the UI thread meant a
+    // busy UI (wheel animation, rendering) stalled mouse input system-wide.
+    private volatile Dispatcher? _mouseHookDispatcher;
+    private volatile bool _hookStopRequested;
 
     public event EventHandler? HotkeyPressed;
     public event EventHandler? WheelDismissed;
@@ -55,54 +62,155 @@ public class HotkeyService : IDisposable
     {
         UnregisterMouseHotkey();
 
-        _mouseProc = MouseHookCallback;
-        IntPtr moduleHandle = NativeMethods.GetModuleHandle(null!);
-        _hookId = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, _mouseProc, moduleHandle, 0);
+        NativeMethods.LowLevelMouseProc mouseProc = MouseHookCallback;
+        _mouseProc = mouseProc; // keep the delegate rooted for the native callback
+        _hookStopRequested = false;
 
-        if (_hookId == IntPtr.Zero)
+        var thread = new Thread(() => MouseHookThreadMain(mouseProc))
         {
-            int error = Marshal.GetLastWin32Error();
-            Debug.WriteLine($"SetWindowsHookEx failed. Error: {error}");
-        }
+            IsBackground = true,
+            Name = "ShortcutWheel-MouseHook"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
     }
 
     public void UnregisterMouseHotkey()
     {
-        if (_hookId != IntPtr.Zero)
+        CancelPendingHold();
+        _hookStopRequested = true;
+
+        // Ask the hook thread to unhook itself, then tear down its pump. The
+        // unhook runs ON the hook thread so there is never a window in which
+        // the pump has stopped but the hook is still installed — that would
+        // leave hook messages undeliverable and freeze system mouse input.
+        // This never blocks the UI thread; the hook thread is a background
+        // thread, so if the app is shutting down the process exits regardless
+        // of whether the teardown finished.
+        var dispatcher = _mouseHookDispatcher;
+        _mouseHookDispatcher = null;
+        if (dispatcher != null)
         {
-            NativeMethods.UnhookWindowsHookEx(_hookId);
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (_hookId != IntPtr.Zero)
+                    {
+                        NativeMethods.UnhookWindowsHookEx(_hookId);
+                        _hookId = IntPtr.Zero;
+                    }
+                }
+                catch { }
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+            }));
+        }
+    }
+
+    /// <summary>
+    /// Entry point for the dedicated mouse-hook thread. Installs the
+    /// WH_MOUSE_LL hook and runs a message pump. The system invokes the hook
+    /// proc by posting a message to the installing thread, so this loop must
+    /// stay alive for the hook to keep working.
+    /// </summary>
+    private void MouseHookThreadMain(NativeMethods.LowLevelMouseProc mouseProc)
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        _mouseHookDispatcher = dispatcher;
+
+        try
+        {
+            IntPtr moduleHandle = NativeMethods.GetModuleHandle(null!);
+            _hookId = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, mouseProc, moduleHandle, 0);
+            if (_hookId == IntPtr.Zero)
+            {
+                int error = Marshal.GetLastWin32Error();
+                Debug.WriteLine($"SetWindowsHookEx failed. Error: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"SetWindowsHookEx threw: {ex.Message}");
             _hookId = IntPtr.Zero;
+        }
+
+        if (_hookStopRequested)
+        {
+            // Unregistered before the pump ever ran — remove the hook and exit.
+            try
+            {
+                if (_hookId != IntPtr.Zero)
+                {
+                    NativeMethods.UnhookWindowsHookEx(_hookId);
+                    _hookId = IntPtr.Zero;
+                }
+            }
+            catch { }
+            return;
+        }
+
+        Dispatcher.Run();
+
+        // Pump exited (shutdown requested) — clean up the hook from this thread.
+        try
+        {
+            if (_hookId != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWindowsHookEx(_hookId);
+                _hookId = IntPtr.Zero;
+            }
+        }
+        catch { }
+    }
+
+    private void CancelPendingHold()
+    {
+        lock (_holdLock)
+        {
+            _holdCts?.Cancel();
         }
     }
 
     private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && _config != null)
+        try
         {
-            int msg = wParam.ToInt32();
-
-            if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: true))
+            if (nCode >= 0 && _config != null)
             {
-                CancellationTokenSource cts;
-                lock (_holdLock)
-                {
-                    _holdCts?.Cancel();
-                    cts = new CancellationTokenSource();
-                    _holdCts = cts;
-                }
+                int msg = wParam.ToInt32();
 
-                _ = NotifyAfterHoldAsync(_config.HoldDelayMs, cts);
-            }
-            else if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: false))
-            {
-                lock (_holdLock)
+                if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: true))
                 {
-                    _holdCts?.Cancel();
-                }
+                    CancellationTokenSource cts;
+                    lock (_holdLock)
+                    {
+                        _holdCts?.Cancel();
+                        cts = new CancellationTokenSource();
+                        _holdCts = cts;
+                    }
 
-                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                    WheelDismissed?.Invoke(this, EventArgs.Empty)));
+                    _ = NotifyAfterHoldAsync(_config.HoldDelayMs, cts);
+                }
+                else if (IsConfiguredMouseButtonEvent(_config.MouseButton, msg, lParam, isDown: false))
+                {
+                    lock (_holdLock)
+                    {
+                        _holdCts?.Cancel();
+                    }
+
+                    // The callback runs on the dedicated hook thread, so any UI
+                    // marshal must tolerate the app shutting down (Application
+                    // may already be null / its dispatcher ceasing to accept work).
+                    if (Application.Current != null)
+                        Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                            WheelDismissed?.Invoke(this, EventArgs.Empty)));
+                }
             }
+        }
+        catch
+        {
+            // Never let a hook callback exception propagate into the native
+            // hook invocation and kill the dedicated hook thread.
         }
 
         return NativeMethods.CallNextHookEx(_hookId, nCode, wParam, lParam);
@@ -115,8 +223,11 @@ public class HotkeyService : IDisposable
             await Task.Delay(delayMs, cts.Token);
             if (!cts.Token.IsCancellationRequested)
             {
-                _ = Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                    WheelVisibilityChanged?.Invoke(true)));
+                // Tolerate the app shutting down (Application may already be
+                // null / its dispatcher ceasing to accept work).
+                if (Application.Current?.Dispatcher is { } dispatcher)
+                    _ = dispatcher.BeginInvoke(new Action(() =>
+                        WheelVisibilityChanged?.Invoke(true)));
             }
         }
         catch (OperationCanceledException)

@@ -111,13 +111,20 @@ public class RadialMenu : FrameworkElement
 
     private List<ShortcutItem> _items = new();
     private int _hoveredIndex = -1;
-    private double _animationProgress = 1.0;
+    private double _animationProgress;
     private bool _isAnimating;
+    private bool _isCollapsing;
+    private bool _collapseReady;
+    private int _clickedIndex = -1;
+    private double _clickAnimationProgress = 0.0;
+    private bool _isClickAnimating;
+    private readonly ScaleTransform _showTransform = new(0.0, 0.0);
 
     public double AnimationProgress => _animationProgress;
 
     public event EventHandler<int>? WedgeClicked;
     public event EventHandler? CenterClicked;
+    public event EventHandler? CollapseCompleted;
 
     #endregion
 
@@ -125,6 +132,8 @@ public class RadialMenu : FrameworkElement
     {
         SnapsToDevicePixels = true;
         Focusable = true;
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = _showTransform;
     }
 
     public void SetItems(IList<ShortcutItem> items)
@@ -142,30 +151,130 @@ public class RadialMenu : FrameworkElement
     {
         _animationProgress = 0.0;
         _isAnimating = true;
+        _isCollapsing = false;
+        _collapseReady = false;
+        _isClickAnimating = false;
+        _clickedIndex = -1;
         CompositionTarget.Rendering -= OnRendering;
         CompositionTarget.Rendering += OnRendering;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Puts the wheel in its collapsed visual state without starting the
+    /// render loop. OverlayWindow uses this before showing the window so the
+    /// first visible frame can never be the fully expanded wheel.
+    /// </summary>
+    public void PrepareForShow()
+    {
+        _animationProgress = 0.0;
+        _isAnimating = false;
+        _isCollapsing = false;
+        _collapseReady = false;
+        _isClickAnimating = false;
+        _clickedIndex = -1;
+        _showTransform.ScaleX = 0.0;
+        _showTransform.ScaleY = 0.0;
+        CompositionTarget.Rendering -= OnRendering;
+        InvalidateVisual();
     }
 
     public void AnimateOut()
     {
-        _animationProgress = 1.0;
-        _isAnimating = false;
+        // Keep the last rendered state as the starting point. If the wheel
+        // is already fully visible this gives a smooth collapse; if it is
+        // still behind the first-show gate, it remains collapsed.
+        _animationProgress = Math.Clamp(_animationProgress, 0.0, 1.0);
+        _isAnimating = true;
+        _isCollapsing = true;
+        _collapseReady = false;
+        _isClickAnimating = false;
+        _clickedIndex = -1;
         CompositionTarget.Rendering -= OnRendering;
+        CompositionTarget.Rendering += OnRendering;
+        InvalidateVisual();
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (!_isAnimating) return;
+        bool needsRedraw = false;
 
-        _animationProgress += 0.06; // ~16ms * 16 = 250ms total
-        if (_animationProgress >= 1.0)
+        // Leave the collapsed frame in the visual tree for one full render
+        // pass before notifying the window that it can be hidden. This makes
+        // the last cached surface deterministic for the next activation.
+        if (_isCollapsing && _collapseReady)
         {
-            _animationProgress = 1.0;
-            _isAnimating = false;
+            _collapseReady = false;
+            _isCollapsing = false;
+            _showTransform.ScaleX = 0.0;
+            _showTransform.ScaleY = 0.0;
             CompositionTarget.Rendering -= OnRendering;
+            CollapseCompleted?.Invoke(this, EventArgs.Empty);
+            return;
         }
 
-        InvalidateVisual();
+        if (_isAnimating)
+        {
+            if (_isCollapsing)
+            {
+                _animationProgress -= 0.08; // ~200ms total
+                if (_animationProgress <= 0.0)
+                {
+                    _animationProgress = 0.0;
+                    _isAnimating = false;
+                    _collapseReady = true;
+                }
+            }
+            else
+            {
+                // The previous render can still be cached by WPF when the
+                // window is shown again. The transform starts at zero in
+                // PrepareForShow, so that cached frame is invisible. Restore
+                // it only inside the first new render tick, when OnRender is
+                // also using the new (collapsed) animation progress.
+                _showTransform.ScaleX = 1.0;
+                _showTransform.ScaleY = 1.0;
+                _animationProgress += 0.06; // ~16ms * 16 = 250ms total
+                if (_animationProgress >= 1.0)
+                {
+                    _animationProgress = 1.0;
+                    _isAnimating = false;
+                }
+            }
+            needsRedraw = true;
+        }
+
+        if (_isClickAnimating)
+        {
+            _clickAnimationProgress += 0.15; // ~100ms total
+            if (_clickAnimationProgress >= 1.0)
+            {
+                _clickAnimationProgress = 1.0;
+                _isClickAnimating = false;
+                
+                int clickedIdx = _clickedIndex;
+                _clickedIndex = -1;
+                
+                if (clickedIdx == -2)
+                {
+                    CenterClicked?.Invoke(this, EventArgs.Empty);
+                }
+                else if (clickedIdx >= 0 && clickedIdx < _items.Count)
+                {
+                    WedgeClicked?.Invoke(this, clickedIdx);
+                }
+            }
+            needsRedraw = true;
+        }
+
+        if (needsRedraw)
+        {
+            InvalidateVisual();
+        }
+        else
+        {
+            CompositionTarget.Rendering -= OnRendering;
+        }
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -246,6 +355,15 @@ public class RadialMenu : FrameworkElement
     private void DrawSingleWedge(DrawingContext dc, Point center, double animRadius,
         int i, int count, bool hasItems, Pen separatorPen)
     {
+        double scale = 1.0;
+        bool isClicked = _isClickAnimating && i == _clickedIndex;
+        if (isClicked)
+        {
+            scale = 1.0 + (1.0 - _clickAnimationProgress) * 0.05;
+            var scaleTrans = new ScaleTransform(scale, scale, center.X, center.Y);
+            dc.PushTransform(scaleTrans);
+        }
+
         double wedgeAngle = 360.0 / count;
         double startAngle = i * wedgeAngle - 90 - wedgeAngle / 2;
         double endAngle = startAngle + wedgeAngle;
@@ -259,34 +377,44 @@ public class RadialMenu : FrameworkElement
         Brush fill = BuildWedgeFill(center, animRadius, isHovered);
         dc.DrawGeometry(fill, separatorPen, wedge);
 
-        if (isEmpty) return;
-
-        double midAngle = (startAngle + endAngle) / 2;
-
-        // Number indicator (CSGO has 1..6 near the centre)
-        double numRadius = CenterRadius + Math.Min(22, Math.Max(0, (animRadius - CenterRadius) * 0.12));
-        Point numPos = WedgeGeometry.PolarToCartesian(center, numRadius, midAngle);
-        var numBrush = new SolidColorBrush(isHovered
-            ? TrimColor
-            : Color.FromArgb(0xAA, TrimColor.R, TrimColor.G, TrimColor.B));
-        numBrush.Freeze();
-
-        var num = new FormattedText((i + 1).ToString(),
-            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
-                         FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            13, numBrush, 96);
-        dc.DrawText(num, new Point(numPos.X - num.Width / 2, numPos.Y - num.Height / 2));
-
-        if (!hasItems)
+        if (!isEmpty)
         {
-            DrawPlaceholderLabel(dc, center, animRadius, midAngle);
-            return;
+            double midAngle = (startAngle + endAngle) / 2;
+
+            // Number indicator (CSGO has 1..6 near the centre)
+            double numRadius = CenterRadius + Math.Min(22, Math.Max(0, (animRadius - CenterRadius) * 0.12));
+            Point numPos = WedgeGeometry.PolarToCartesian(center, numRadius, midAngle);
+            var numBrush = new SolidColorBrush(isHovered
+                ? TrimColor
+                : Color.FromArgb(0xAA, TrimColor.R, TrimColor.G, TrimColor.B));
+            numBrush.Freeze();
+
+            var num = new FormattedText((i + 1).ToString(),
+                CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Microsoft YaHei UI, Segoe UI"),
+                             FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                13, numBrush, 96);
+            dc.DrawText(num, new Point(numPos.X - num.Width / 2, numPos.Y - num.Height / 2));
+
+            if (!hasItems)
+            {
+                DrawPlaceholderLabel(dc, center, animRadius, midAngle);
+            }
+            else
+            {
+                // Real items: icon + label
+                var item = _items[i];
+                DrawWedgeContent(dc, item, center, animRadius, midAngle, isHovered);
+            }
         }
 
-        // Real items: icon + label
-        var item = _items[i];
-        DrawWedgeContent(dc, item, center, animRadius, midAngle, isHovered);
+        if (isClicked)
+        {
+            var flashBrush = new SolidColorBrush(Color.FromArgb((byte)((1.0 - _clickAnimationProgress) * 180), 255, 235, 150));
+            flashBrush.Freeze();
+            dc.DrawGeometry(flashBrush, null, wedge);
+            dc.Pop();
+        }
     }
 
     private Brush BuildWedgeFill(Point center, double animRadius, bool hovered)
@@ -431,6 +559,14 @@ public class RadialMenu : FrameworkElement
 
     private void DrawCenterCircle(DrawingContext dc, Point center, bool hasItems)
     {
+        bool isClicked = _isClickAnimating && _clickedIndex == -2;
+        if (isClicked)
+        {
+            double scale = 1.0 + (1.0 - _clickAnimationProgress) * 0.08;
+            var scaleTrans = new ScaleTransform(scale, scale, center.X, center.Y);
+            dc.PushTransform(scaleTrans);
+        }
+
         // Subtle vertical gradient on the centre disc – CSGO logo background.
         var grad = new LinearGradientBrush
         {
@@ -476,6 +612,14 @@ public class RadialMenu : FrameworkElement
                 10, pageBrush, 96);
             double y = center.Y + CenterRadius - 16;
             dc.DrawText(pageText, new Point(center.X - pageText.Width / 2, y));
+        }
+
+        if (isClicked)
+        {
+            var flashBrush = new SolidColorBrush(Color.FromArgb((byte)((1.0 - _clickAnimationProgress) * 180), 255, 235, 150));
+            flashBrush.Freeze();
+            dc.DrawEllipse(flashBrush, null, center, CenterRadius - 2, CenterRadius - 2);
+            dc.Pop();
         }
     }
 
@@ -617,16 +761,19 @@ public class RadialMenu : FrameworkElement
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        if (_isClickAnimating) return;
+
         var pos = e.GetPosition(this);
         int idx = HitTestWedge(pos);
 
-        if (idx == -2)
+        if (idx == -2 || (idx >= 0 && idx < _items.Count))
         {
-            CenterClicked?.Invoke(this, EventArgs.Empty);
-        }
-        else if (idx >= 0 && idx < _items.Count)
-        {
-            WedgeClicked?.Invoke(this, idx);
+            _clickedIndex = idx;
+            _clickAnimationProgress = 0.0;
+            _isClickAnimating = true;
+
+            CompositionTarget.Rendering -= OnRendering;
+            CompositionTarget.Rendering += OnRendering;
         }
 
         e.Handled = true;

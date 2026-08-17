@@ -62,7 +62,11 @@ public static class ShortcutResolver
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         try
         {
-            return await Task.Run(() => Resolve(shortcutPath), cts.Token);
+            // ConfigureAwait(false): this method's own continuation does not
+            // touch UI state, so it need not resume on the UI thread. The
+            // caller's continuation is unaffected.
+            return await Task.Run(() => Resolve(shortcutPath), cts.Token)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

@@ -234,4 +234,7 @@
   <data name="TrayHelp">
     <value>显示帮助</value>
   </data>
+  <data name="TrayHotkeys">
+    <value>快捷键调用</value>
+  </data>
 </root>
